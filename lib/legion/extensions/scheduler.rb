@@ -1,4 +1,6 @@
-require "legion/extensions/scheduler/version"
+# frozen_string_literal: true
+
+require 'legion/extensions/scheduler/version'
 
 module Legion
   module Extensions

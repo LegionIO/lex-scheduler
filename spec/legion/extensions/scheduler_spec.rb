@@ -1,9 +1,7 @@
-RSpec.describe Legion::Extensions::Scheduler do
-  it "has a version number" do
-    expect(Legion::Extensions::Scheduler::VERSION).not_to be nil
-  end
+# frozen_string_literal: true
 
-  it "does something useful" do
-    expect(false).to eq(true)
+RSpec.describe Legion::Extensions::Scheduler do
+  it 'has a version number' do
+    expect(Legion::Extensions::Scheduler::VERSION).not_to be nil
   end
 end
