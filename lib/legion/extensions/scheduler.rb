@@ -1,12 +1,16 @@
 # frozen_string_literal: true
 
 require 'legion/extensions/scheduler/version'
+require 'legion/extensions'
 
 module Legion
   module Extensions
     module Scheduler
-      class Error < StandardError; end
-      # Your code goes here...
+      extend Legion::Extensions::Core
+
+      def data_required?
+        true
+      end
     end
   end
 end
