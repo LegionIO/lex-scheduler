@@ -5,6 +5,8 @@ module Legion::Extensions::Scheduler::Transport::Messages
     end
 
     def message
+      return @options if routing_key == 'task.subtask.transform'
+
       {
         args: @options[:args] || @options,
         function: function.values[:name]
@@ -12,11 +14,19 @@ module Legion::Extensions::Scheduler::Transport::Messages
     end
 
     def routing_key
-      "#{function.runner.extension.values[:name]}.#{function.runner.values[:name]}.#{function.values[:name]}"
+      @routing_key ||= if @options.key?(:routing_key)
+                         @options[:routing_key]
+                       else
+                         "#{function.runner.extension.values[:name]}.#{function.runner.values[:name]}.#{function.values[:name]}" # rubocop:disable Layout/LineLength
+                       end
     end
 
     def exchange
-      Legion::Transport::Exchange.new(function.runner.extension.values[:exchange])
+      @exchange ||= if @options.key?(:exchange) && @options[:exchange].is_a?(String)
+                      Legion::Transport::Exchange.new(@options[:exchange])
+                    else
+                      Legion::Transport::Exchange.new(function.runner.extension.values[:exchange])
+                    end
     end
 
     def function
