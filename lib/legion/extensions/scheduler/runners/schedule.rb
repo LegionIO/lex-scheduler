@@ -52,6 +52,7 @@ module Legion
             end
 
             return Legion::Transport::Messages::Dynamic.new(**opts).publish if opts[:transformation].nil?
+
             payload[:exchange] = 'task'
             payload[:routing_key] = 'task.subtask.transform'
             payload[:transformation] = opts[:transformation]
