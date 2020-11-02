@@ -8,6 +8,10 @@ module Legion
       def self.data_required?
         true
       end
+
+      def data_required?
+        true
+      end
     end
   end
 end
