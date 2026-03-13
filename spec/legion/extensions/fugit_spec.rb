@@ -27,7 +27,11 @@ RSpec.describe 'Fugit cron parsing' do
   it 'parses an hourly cron expression' do
     cron = Fugit.parse('0 * * * *')
     expect(cron).not_to be_nil
-    expect(cron.next_time).to be_a(Fugit::Nat::EtOrbi::EoTime) rescue expect(cron.next_time).not_to be_nil
+    begin
+      expect(cron.next_time).to be_a(Fugit::Nat::EtOrbi::EoTime)
+    rescue StandardError
+      expect(cron.next_time).not_to be_nil
+    end
   end
 
   it 'returns nil for invalid expressions' do
