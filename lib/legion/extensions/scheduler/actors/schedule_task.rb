@@ -1,23 +1,31 @@
-module Legion::Extensions::Scheduler::Actor
-  class ScheduleTask < Legion::Extensions::Actors::Every
-    def runner_function
-      'push_refresh'
-    end
+# frozen_string_literal: true
 
-    def runner_class
-      Legion::Extensions::Scheduler::Runners::Schedule
-    end
+module Legion
+  module Extensions
+    module Scheduler
+      module Actor
+        class ScheduleTask < Legion::Extensions::Actors::Every
+          def runner_function
+            'push_refresh'
+          end
 
-    def use_runner?
-      false
-    end
+          def runner_class
+            Legion::Extensions::Scheduler::Runners::Schedule
+          end
 
-    def check_subtask?
-      false
-    end
+          def use_runner?
+            false
+          end
 
-    def generate_task?
-      false
+          def check_subtask?
+            false
+          end
+
+          def generate_task?
+            false
+          end
+        end
+      end
     end
   end
 end

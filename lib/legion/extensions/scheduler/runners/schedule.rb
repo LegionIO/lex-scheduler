@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'fugit'
 
 module Legion
@@ -10,6 +12,7 @@ module Legion
           include Legion::Extensions::Helpers::Data
 
           include Legion::Extensions::Helpers::Lex
+
           def push_refresh(**)
             Legion::Extensions::Scheduler::Transport::Messages::Refresh.new.publish
           end
@@ -37,9 +40,9 @@ module Legion
               function = Legion::Data::Model::Function[row.values[:function_id]]
 
               send_task(transformation: row.values[:transformation],
-                        function_id: row.values[:function_id],
-                        expiration: row.values[:task_ttl],
-                        function: function.values[:name],
+                        function_id:    row.values[:function_id],
+                        expiration:     row.values[:task_ttl],
+                        function:       function.values[:name],
                         **Legion::JSON.load(row.values[:payload]))
               row.update(last_run: Sequel::CURRENT_TIMESTAMP)
             end
