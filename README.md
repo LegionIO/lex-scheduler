@@ -12,12 +12,26 @@ gem install lex-scheduler
 
 ## Usage
 
-Schedules are stored in the database with either a cron expression or interval:
+Schedules are stored in the database with either a cron expression or an interval:
 
-- **Interval**: Run every N seconds after the last completion
-- **Cron**: Run at specific times (`*/5 * * * *` or verbose like `every day at noon`)
+- **Interval**: Run every N seconds since the last completion (integer)
+- **Cron**: Run at specific times using standard cron syntax (`*/5 * * * *`) or human-readable expressions (`every day at noon`) parsed by `fugit`
 
-Cron parsing is handled by `fugit`, which supports both standard cron syntax and human-readable expressions.
+Schedules can also carry a `transformation` ERB template. If present, the scheduled task is routed through `lex-transformer` before execution.
+
+### Adding Schedules
+
+Insert records into the `schedules` table via `legion-data`:
+
+```ruby
+Legion::Extensions::Scheduler::Data::Models::Schedule.insert(
+  function_id: 42,
+  interval:    300,          # run every 5 minutes
+  active:      1,
+  last_run:    Time.now,
+  payload:     '{}'
+)
+```
 
 ## Requirements
 
@@ -25,7 +39,7 @@ Cron parsing is handled by `fugit`, which supports both standard cron syntax and
 - [LegionIO](https://github.com/LegionIO/LegionIO) framework
 - `legion-data` (schedule persistence)
 - `legion-cache` (distributed scheduler lock)
-- `fugit` (cron expression parsing)
+- `fugit` >= 1.9 (cron expression parsing)
 
 ## License
 
