@@ -10,7 +10,6 @@ module Legion
               {
                 arguments:   {
                   'x-single-active-consumer': true,
-                  'x-max-priority':           255,
                   'x-message-ttl':            5
                 },
                 auto_delete: false
