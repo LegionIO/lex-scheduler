@@ -16,70 +16,105 @@ module Legion
     module Scheduler
       module Transport
         module Messages
-          class Refresh
-            def initialize(**); end
-            def publish; end
-          end unless defined?(Refresh)
+          unless defined?(Refresh)
+            class Refresh
+              def initialize(**); end
+              def publish; end
+            end
+          end
 
-          class SendTask
-            def initialize(**); end
-            def publish; end
-          end unless defined?(SendTask)
+          unless defined?(SendTask)
+            class SendTask
+              def initialize(**); end
+              def publish; end
+            end
+          end
         end
       end
     end
   end
 
-  module Cache
-    def self.set(*); end
-    def self.get(key); nil end
-  end unless defined?(Legion::Cache)
-
-  module Settings
-    def self.[](key); @store ||= {}; @store[key] end
-    def self.[]=(key, val); @store ||= {}; @store[key] = val end
-  end unless defined?(Legion::Settings)
-
-  module Data
-    module Model
-      class Function
-        def self.[](id); nil end
-        def values; { name: 'test_func' } end
-      end unless defined?(Function)
-
-      class Schedule; end unless defined?(Schedule)
+  unless defined?(Legion::Cache)
+    module Cache
+      def self.set(*); end
+      def self.get(_key) = nil
     end
-  end unless defined?(Legion::Data)
+  end
 
-  module Transport
-    module Messages
-      class Dynamic
-        def initialize(**); end
-        def publish; end
-      end unless defined?(Dynamic)
+  unless defined?(Legion::Settings)
+    module Settings
+      def self.[](key)
+        @store ||= {}
+        @store[key]
+      end
+
+      def self.[]=(key, val)
+        @store ||= {}
+        @store[key] = val
+      end
     end
-  end unless defined?(Legion::Transport)
+  end
 
-  module JSON
-    def self.load(str); ::JSON.parse(str, symbolize_names: true) rescue {} end
-  end unless defined?(Legion::JSON)
+  unless defined?(Legion::Data)
+    module Data
+      module Model
+        unless defined?(Function)
+          class Function
+            def self.[](_id) = nil
+            def values = { name: 'test_func' }
+          end
+        end
 
-  module Logging
-    def self.debug(*); end
-  end unless defined?(Legion::Logging)
+        unless defined?(Schedule)
+          class Schedule # rubocop:disable Lint/EmptyClass
+          end
+        end
+      end
+    end
+  end
+
+  unless defined?(Legion::Transport)
+    module Transport
+      module Messages
+        unless defined?(Dynamic)
+          class Dynamic
+            def initialize(**); end
+            def publish; end
+          end
+        end
+      end
+    end
+  end
+
+  unless defined?(Legion::JSON)
+    module JSON
+      def self.load(str)
+        ::JSON.parse(str, symbolize_names: true)
+      rescue StandardError
+        {}
+      end
+    end
+  end
+
+  unless defined?(Legion::Logging)
+    module Logging
+      def self.debug(*); end
+    end
+  end
 end
 
 require 'json'
 
 # Stub Sequel constants used in the runner
-module Sequel
-  CURRENT_TIMESTAMP = :CURRENT_TIMESTAMP unless defined?(CURRENT_TIMESTAMP)
-  def self.lit(str); str end
-end unless defined?(Sequel)
+unless defined?(Sequel)
+  module Sequel
+    CURRENT_TIMESTAMP = :CURRENT_TIMESTAMP unless defined?(CURRENT_TIMESTAMP)
+    def self.lit(str) = str
+  end
+end
 
 require 'legion/extensions/scheduler/runners/schedule'
 
-# rubocop:disable Metrics/BlockLength
 RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
   let(:runner) do
     klass = Class.new do
@@ -203,14 +238,14 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
       context 'with an interval-based schedule that has not elapsed' do
         let(:row) do
           double('row', values: {
-            interval: 60,
-            cron:     nil,
-            last_run: Time.now - 10,
-            function_id: 1,
-            payload: '{}',
-            transformation: nil,
-            task_ttl: nil
-          })
+                   interval:       60,
+                   cron:           nil,
+                   last_run:       Time.now - 10,
+                   function_id:    1,
+                   payload:        '{}',
+                   transformation: nil,
+                   task_ttl:       nil
+                 })
         end
 
         before do
@@ -227,14 +262,14 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         let(:func) { double('function', values: { name: 'run_job' }) }
         let(:row) do
           double('row', values: {
-            interval: 30,
-            cron:     nil,
-            last_run: Time.now - 60,
-            function_id: 1,
-            payload: '{}',
-            transformation: nil,
-            task_ttl: nil
-          })
+                   interval:       30,
+                   cron:           nil,
+                   last_run:       Time.now - 60,
+                   function_id:    1,
+                   payload:        '{}',
+                   transformation: nil,
+                   task_ttl:       nil
+                 })
         end
 
         before do
@@ -261,14 +296,14 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         it 'skips when last_run is after the previous cron time' do
           # A schedule that just ran - last_run is very recent
           row = double('row', values: {
-            interval:    nil,
-            cron:        '*/5 * * * *',
-            last_run:    Time.now,
-            function_id: 1,
-            payload:     '{}',
-            transformation: nil,
-            task_ttl:    nil
-          })
+                         interval:       nil,
+                         cron:           '*/5 * * * *',
+                         last_run:       Time.now,
+                         function_id:    1,
+                         payload:        '{}',
+                         transformation: nil,
+                         task_ttl:       nil
+                       })
           allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
           expect(runner).not_to receive(:send_task)
           runner.schedule_tasks
@@ -277,4 +312,3 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
     end
   end
 end
-# rubocop:enable Metrics/BlockLength
