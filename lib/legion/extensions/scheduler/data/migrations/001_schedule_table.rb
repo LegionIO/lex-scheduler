@@ -8,6 +8,7 @@ Sequel.migration do
       String :name, null: false
       Integer :interval, null: true
       String :cron, null: true, text: true
+      Integer :task_ttl, null: true
       TrueClass :active, default: true
       DateTime :last_run, null: true
       DateTime :created, default: Sequel::CURRENT_TIMESTAMP
