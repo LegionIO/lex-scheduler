@@ -4,11 +4,11 @@ source 'https://rubygems.org'
 
 gemspec
 
-gem 'bundler', '>= 2'
-gem 'legionio'
-gem 'rake'
-gem 'rspec'
-gem 'rubocop'
-gem 'sequel'
-gem 'simplecov'
-gem 'sqlite3'
+group :test do
+  gem 'rake'
+  gem 'rspec', '~> 3.13'
+  gem 'rubocop', '~> 1.75'
+  gem 'sequel'
+  gem 'simplecov'
+  gem 'sqlite3'
+end
