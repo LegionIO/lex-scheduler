@@ -69,6 +69,12 @@ module Legion
           class Schedule # rubocop:disable Lint/EmptyClass
           end
         end
+
+        unless defined?(ScheduleLog)
+          class ScheduleLog
+            def self.insert(**); end
+          end
+        end
       end
     end
   end
@@ -306,6 +312,111 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
                        })
           allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
           expect(runner).not_to receive(:send_task)
+          runner.schedule_tasks
+        end
+
+        it 'dispatches when last_run is before the previous cron time' do
+          func = double('function', values: { name: 'cron_job' })
+          # last_run is long ago, so previous cron time has passed since then
+          row = double('row', values: {
+                         interval:       nil,
+                         cron:           '*/5 * * * *',
+                         last_run:       Time.now - 3600,
+                         function_id:    1,
+                         payload:        '{}',
+                         transformation: nil,
+                         task_ttl:       nil
+                       })
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
+          allow(row).to receive(:update)
+          allow(Legion::Data::Model::ScheduleLog).to receive(:insert)
+          expect(runner).to receive(:send_task)
+          runner.schedule_tasks
+        end
+      end
+
+      context 'with a schedule that has nil last_run (new schedule)' do
+        let(:func) { double('function', values: { name: 'new_job' }) }
+        let(:row) do
+          double('row', values: {
+                   interval:       60,
+                   cron:           nil,
+                   last_run:       nil,
+                   function_id:    1,
+                   payload:        '{}',
+                   transformation: nil,
+                   task_ttl:       nil
+                 })
+        end
+
+        before do
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
+          allow(row).to receive(:update)
+          allow(Legion::Data::Model::ScheduleLog).to receive(:insert)
+        end
+
+        it 'dispatches without crashing' do
+          expect { runner.schedule_tasks }.not_to raise_error
+        end
+
+        it 'calls send_task' do
+          expect(runner).to receive(:send_task)
+          runner.schedule_tasks
+        end
+      end
+
+      context 'with a schedule whose function_id returns nil' do
+        let(:row) do
+          double('row', values: {
+                   interval:       60,
+                   cron:           nil,
+                   last_run:       Time.now - 120,
+                   function_id:    999,
+                   payload:        '{}',
+                   transformation: nil,
+                   task_ttl:       nil
+                 })
+        end
+
+        before do
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Function).to receive(:[]).with(999).and_return(nil)
+        end
+
+        it 'skips the schedule without crashing' do
+          expect(runner).not_to receive(:send_task)
+          expect { runner.schedule_tasks }.not_to raise_error
+        end
+      end
+
+      context 'with an interval-based schedule that dispatches' do
+        let(:func) { double('function', values: { name: 'run_job' }) }
+        let(:row) do
+          double('row', values: {
+                   interval:       30,
+                   cron:           nil,
+                   last_run:       Time.now - 60,
+                   function_id:    1,
+                   payload:        '{}',
+                   transformation: nil,
+                   task_ttl:       nil,
+                   id:             42
+                 })
+        end
+
+        before do
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
+          allow(row).to receive(:update)
+          allow(runner).to receive(:send_task)
+        end
+
+        it 'writes a ScheduleLog entry after dispatching' do
+          expect(Legion::Data::Model::ScheduleLog).to receive(:insert).with(
+            hash_including(schedule_id: 42, function_id: 1, success: true, status: 'dispatched')
+          )
           runner.schedule_tasks
         end
       end

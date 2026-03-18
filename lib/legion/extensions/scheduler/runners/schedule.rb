@@ -25,25 +25,37 @@ module Legion
             return unless Legion::Cache.get('scheduler_schedule_lock') == Legion::Settings[:client][:name]
 
             models_class::Schedule.where(active: 1).each do |row|
+              last_run = row.values[:last_run] || Time.at(0)
+
               if row.values[:interval].is_a?(Integer) && row.values[:interval].positive?
-                next if (Time.now - row.values[:last_run]) < row.values[:interval]
+                next if (Time.now - last_run) < row.values[:interval]
               elsif row.values[:cron].is_a? String
                 cron_class = Fugit.parse(row.values[:cron])
                 if cron_class.respond_to? :to_sec
-                  next if (Time.now - row.values[:last_run]) < cron_class.to_sec
+                  next if (Time.now - last_run) < cron_class.to_sec
                 elsif cron_class.respond_to? :previous_time
-                  next if Time.now < Time.parse(cron_class.previous_time.to_s)
-                  next if row.values[:last_run] > Time.parse(cron_class.previous_time.to_s)
+                  prev = Time.parse(cron_class.previous_time.to_s)
+                  next if last_run > prev
                 end
               end
 
               function = Legion::Data::Model::Function[row.values[:function_id]]
+              next unless function
 
               send_task(transformation: row.values[:transformation],
                         function_id:    row.values[:function_id],
                         expiration:     row.values[:task_ttl],
                         function:       function.values[:name],
                         **Legion::JSON.load(row.values[:payload]))
+
+              models_class::ScheduleLog.insert(
+                schedule_id: row.values[:id],
+                function_id: row.values[:function_id],
+                success: true,
+                status: 'dispatched',
+                created: Sequel::CURRENT_TIMESTAMP
+              )
+
               row.update(last_run: Sequel::CURRENT_TIMESTAMP)
             end
           end
