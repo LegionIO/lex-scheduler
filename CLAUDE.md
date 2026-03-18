@@ -10,7 +10,7 @@ Core Legion Extension that manages scheduled, delayed, and cron-style task execu
 
 **GitHub**: https://github.com/LegionIO/lex-scheduler
 **License**: MIT
-**Version**: 0.1.3
+**Version**: 0.2.0
 
 ## Architecture
 
