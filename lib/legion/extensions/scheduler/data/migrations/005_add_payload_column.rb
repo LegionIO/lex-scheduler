@@ -3,7 +3,7 @@
 Sequel.migration do
   change do
     alter_table(:schedules) do
-      add_column :payload, File, null: false, default: '{}'
+      add_column :payload, String, text: true, null: true, default: '{}'
     end
   end
 end

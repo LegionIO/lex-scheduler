@@ -5,10 +5,8 @@ module Legion
     module Scheduler
       module Data
         module Model
-          class Schedule < Sequel::Model
-            one_to_many :schedule_logs
-            many_to_one :task
-            many_to_one :function
+          class ScheduleLog < Sequel::Model(:schedule_logs)
+            many_to_one :schedule, class: '::Legion::Extensions::Scheduler::Data::Model::Schedule'
           end
         end
       end
