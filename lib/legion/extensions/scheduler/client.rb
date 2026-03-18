@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'fugit'
 require_relative 'runners/schedule'
 
 module Legion
@@ -10,7 +11,7 @@ module Legion
 
         def initialize(data_model: nil, fugit: nil)
           @data_model = data_model
-          @fugit = fugit || (require 'fugit'; Fugit)
+          @fugit = fugit || Fugit
         end
 
         def models_class

@@ -6,18 +6,12 @@ require 'spec_helper'
 module Legion
   module Extensions
     module Actors
-      unless defined?(Every)
-        class Every
-          def self.inherited(_subclass); end
-        end
-      end
+      class Every; end unless defined?(Every) # rubocop:disable Lint/EmptyClass
     end
 
     module Scheduler
       module Runners
-        unless defined?(Legion::Extensions::Scheduler::Runners::Schedule)
-          module Schedule; end
-        end
+        module Schedule; end unless defined?(Legion::Extensions::Scheduler::Runners::Schedule)
       end
     end
   end

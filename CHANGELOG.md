@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0] - 2026-03-18
+
+### Fixed
+- Migrations 001/002 rewritten as Sequel DSL (cross-DB: SQLite, PostgreSQL, MySQL)
+- Migration 005 column type `File` -> `String, text: true`
+- ScheduleLog model class name (was defining duplicate `Schedule`)
+- Queue TTL from 5ms to 5000ms (messages were expiring instantly)
+- Nil guard on `last_run` (was TypeError on new schedules)
+- Nil guard on function lookup (was NoMethodError on missing function)
+- Removed dead cron guard (`Time.now < previous_time` was always false)
+- ScheduleLog records now created after each dispatch
+- Entry point `data_required?` is now class method only (framework requirement)
+
+### Added
+- Standalone `Scheduler::Client` for programmatic schedule management
+- Comprehensive spec coverage (92%+)
+
+### Removed
+- ModeScheduler, ModeTransition, EmergencyPromotion runners (dead code, no actor wiring)
+- Dead `message_example` in Refresh message (copy-paste from lex-node)
+
 ## [0.2.0] - 2026-03-17
 
 ### Added

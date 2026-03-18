@@ -5,11 +5,7 @@ require 'spec_helper'
 # Stub transport base class in the exact namespace before requiring queue file
 module Legion
   module Transport
-    unless defined?(Legion::Transport::Queue)
-      class Queue
-        def self.inherited(_subclass); end
-      end
-    end
+    class Queue; end unless defined?(Legion::Transport::Queue) # rubocop:disable Lint/EmptyClass
   end
 end
 

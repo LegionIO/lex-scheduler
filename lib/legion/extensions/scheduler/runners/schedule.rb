@@ -51,9 +51,9 @@ module Legion
               models_class::ScheduleLog.insert(
                 schedule_id: row.values[:id],
                 function_id: row.values[:function_id],
-                success: true,
-                status: 'dispatched',
-                created: Sequel::CURRENT_TIMESTAMP
+                success:     true,
+                status:      'dispatched',
+                created:     Sequel::CURRENT_TIMESTAMP
               )
 
               row.update(last_run: Sequel::CURRENT_TIMESTAMP)
