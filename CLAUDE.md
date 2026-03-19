@@ -37,6 +37,7 @@ Legion::Extensions::Scheduler
 │       ├── 004_schedule_logs_indexes
 │       ├── 005_add_payload_column
 │       └── 006_add_transform_to_schedule
+├── Client                 # Standalone client including Schedule runner; accepts injected data_model and fugit
 └── Transport/
     ├── Queues/Schedule    # Schedule queue
     └── Messages/

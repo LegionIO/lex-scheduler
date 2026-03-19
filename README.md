@@ -33,6 +33,17 @@ Legion::Extensions::Scheduler::Data::Models::Schedule.insert(
 )
 ```
 
+## Standalone Client
+
+`Legion::Extensions::Scheduler::Client` provides access to the Schedule runner:
+
+```ruby
+require 'legion/extensions/scheduler/client'
+client = Legion::Extensions::Scheduler::Client.new
+```
+
+Accepts optional `data_model:` and `fugit:` kwargs for injection (useful in tests).
+
 ## Requirements
 
 - Ruby >= 3.4
