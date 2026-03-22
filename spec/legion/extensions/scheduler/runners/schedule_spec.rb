@@ -151,9 +151,8 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
   end
 
   describe '#refresh' do
-    it 'sets the scheduler lock in cache with 2-second TTL' do
-      expect(Legion::Cache).to receive(:set).with('scheduler_schedule_lock', 'test-node', 2)
-      runner.refresh
+    it 'is a no-op (leadership enforced at actor level via Singleton mixin)' do
+      expect { runner.refresh }.not_to raise_error
     end
   end
 
@@ -220,22 +219,10 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
   end
 
   describe '#schedule_tasks' do
-    context 'when this node does not hold the scheduler lock' do
-      before do
-        allow(Legion::Cache).to receive(:get).with('scheduler_schedule_lock').and_return('other-node')
-      end
+    # Leadership is now enforced at the actor level via Singleton mixin.
+    # The runner always executes when called — the actor decides whether to call it.
 
-      it 'does not query the schedule table' do
-        expect(Legion::Data::Model::Schedule).not_to receive(:where)
-        runner.schedule_tasks
-      end
-    end
-
-    context 'when this node holds the scheduler lock' do
-      before do
-        allow(Legion::Cache).to receive(:get).with('scheduler_schedule_lock').and_return('test-node')
-      end
-
+    context 'when called' do
       it 'queries for active schedules' do
         expect(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([])
         runner.schedule_tasks

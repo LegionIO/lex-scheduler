@@ -5,6 +5,8 @@ module Legion
     module Scheduler
       module Actor
         class RunScheduler < Legion::Extensions::Actors::Every
+          include Legion::Extensions::Actors::Singleton if defined?(Legion::Extensions::Actors::Singleton)
+
           def runner_function
             'schedule_tasks'
           end

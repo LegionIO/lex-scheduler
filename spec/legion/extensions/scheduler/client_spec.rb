@@ -201,10 +201,8 @@ RSpec.describe Legion::Extensions::Scheduler::Client do
   end
 
   describe '#refresh' do
-    it 'sets the scheduler lock via Legion::Cache' do
-      allow(Legion::Settings).to receive(:[]).with(:client).and_return({ name: 'test-node' })
-      expect(Legion::Cache).to receive(:set).with('scheduler_schedule_lock', 'test-node', 2)
-      client.refresh
+    it 'is a no-op (leadership enforced at actor level via Singleton mixin)' do
+      expect { client.refresh }.not_to raise_error
     end
   end
 
@@ -229,24 +227,7 @@ RSpec.describe Legion::Extensions::Scheduler::Client do
   end
 
   describe '#schedule_tasks' do
-    context 'when this node does not hold the scheduler lock' do
-      before do
-        allow(Legion::Settings).to receive(:[]).with(:client).and_return({ name: 'test-node' })
-        allow(Legion::Cache).to receive(:get).with('scheduler_schedule_lock').and_return('other-node')
-      end
-
-      it 'does not query the schedule table' do
-        expect(mock_model::Schedule).not_to receive(:where)
-        client.schedule_tasks
-      end
-    end
-
-    context 'when this node holds the scheduler lock' do
-      before do
-        allow(Legion::Settings).to receive(:[]).with(:client).and_return({ name: 'test-node' })
-        allow(Legion::Cache).to receive(:get).with('scheduler_schedule_lock').and_return('test-node')
-      end
-
+    context 'when called' do
       it 'queries for active schedules' do
         expect(mock_model::Schedule).to receive(:where).with(active: 1).and_return([])
         client.schedule_tasks

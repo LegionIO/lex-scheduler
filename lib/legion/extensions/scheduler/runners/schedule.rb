@@ -17,13 +17,9 @@ module Legion
             Legion::Extensions::Scheduler::Transport::Messages::Refresh.new.publish
           end
 
-          def refresh(**)
-            Legion::Cache.set('scheduler_schedule_lock', Legion::Settings[:client][:name], 2)
-          end
+          def refresh(**); end
 
           def schedule_tasks(**)
-            return unless Legion::Cache.get('scheduler_schedule_lock') == Legion::Settings[:client][:name]
-
             models_class::Schedule.where(active: 1).each do |row|
               last_run = row.values[:last_run] || Time.at(0)
 

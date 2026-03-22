@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- `RunScheduler` actor now uses `Singleton` mixin for leader election instead of soft cache lock
+- `refresh` runner is now a no-op (leadership enforcement moved to actor level)
+- `schedule_tasks` no longer checks `scheduler_schedule_lock` cache key (leadership enforced by Singleton mixin)
+
 ## [0.3.0] - 2026-03-18
 
 ### Fixed
