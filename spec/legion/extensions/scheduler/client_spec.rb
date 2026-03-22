@@ -229,7 +229,7 @@ RSpec.describe Legion::Extensions::Scheduler::Client do
   describe '#schedule_tasks' do
     context 'when called' do
       it 'queries for active schedules' do
-        expect(mock_model::Schedule).to receive(:where).with(active: 1).and_return([])
+        expect(mock_model::Schedule).to receive(:where).with(active: true).and_return([])
         client.schedule_tasks
       end
 
@@ -249,7 +249,7 @@ RSpec.describe Legion::Extensions::Scheduler::Client do
         end
 
         before do
-          allow(mock_model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(mock_model::Schedule).to receive(:where).with(active: true).and_return([row])
           # Runner hardcodes Legion::Data::Model::Function (not injected model)
           allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
           allow(row).to receive(:update)

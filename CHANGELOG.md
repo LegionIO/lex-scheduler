@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.2] - 2026-03-22
+
+### Fixed
+- `schedule_tasks` query uses `active: true` instead of `active: 1` for PostgreSQL boolean compatibility
 
 ### Changed
 - `RunScheduler` actor now uses `Singleton` mixin for leader election instead of soft cache lock

@@ -20,7 +20,7 @@ module Legion
           def refresh(**); end
 
           def schedule_tasks(**)
-            models_class::Schedule.where(active: 1).each do |row|
+            models_class::Schedule.where(active: true).each do |row|
               last_run = row.values[:last_run] || Time.at(0)
 
               if row.values[:interval].is_a?(Integer) && row.values[:interval].positive?

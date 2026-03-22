@@ -224,7 +224,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
 
     context 'when called' do
       it 'queries for active schedules' do
-        expect(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([])
+        expect(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([])
         runner.schedule_tasks
       end
 
@@ -242,7 +242,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         end
 
         before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
         end
 
         it 'skips the schedule' do
@@ -266,7 +266,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         end
 
         before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
           allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
           allow(row).to receive(:update)
         end
@@ -297,7 +297,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
                          transformation: nil,
                          task_ttl:       nil
                        })
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
           expect(runner).not_to receive(:send_task)
           runner.schedule_tasks
         end
@@ -314,7 +314,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
                          transformation: nil,
                          task_ttl:       nil
                        })
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
           allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
           allow(row).to receive(:update)
           allow(Legion::Data::Model::ScheduleLog).to receive(:insert)
@@ -338,7 +338,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         end
 
         before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
           allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
           allow(row).to receive(:update)
           allow(Legion::Data::Model::ScheduleLog).to receive(:insert)
@@ -368,7 +368,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         end
 
         before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
           allow(Legion::Data::Model::Function).to receive(:[]).with(999).and_return(nil)
         end
 
@@ -394,7 +394,7 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
         end
 
         before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: 1).and_return([row])
+          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
           allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
           allow(row).to receive(:update)
           allow(runner).to receive(:send_task)
