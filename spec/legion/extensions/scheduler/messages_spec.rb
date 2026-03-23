@@ -23,13 +23,11 @@ module Legion
     end
   end
 
-  unless defined?(Legion::Data)
-    module Data
-      module Model
-        unless defined?(Legion::Data::Model::Function)
-          class Function
-            def self.[](_id) = nil
-          end
+  module Data
+    module Model
+      unless defined?(Legion::Data::Model::Function)
+        class Function
+          def self.[](_id) = nil
         end
       end
     end
@@ -98,7 +96,7 @@ RSpec.describe Legion::Extensions::Scheduler::Transport::Messages::SendTask do
   end
 
   it 'builds an Exchange for a string exchange option' do
-    expect(Legion::Transport::Exchange).to receive(:new).with('task').and_call_original
+    expect(Legion::Transport::Exchange).to receive(:new).with('task').and_return(double('exchange'))
     message.exchange
   end
 

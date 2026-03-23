@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3] - 2026-03-22
+
+### Changed
+- Add legion-cache, legion-crypt, legion-data, legion-json, legion-logging, legion-settings, legion-transport as runtime dependencies
+- Replace direct `Legion::JSON.load` call in `Runners::Schedule#schedule_tasks` with `json_load` helper
+- Update spec_helper with real sub-gem helper requires and `Helpers::Lex` stub
+- Update spec stubs to use specific constant guards (`defined?(Legion::Data::Model::*)`) instead of broad `defined?(Legion::Data)` guards
+
 ## [0.3.2] - 2026-03-22
 
 ### Fixed

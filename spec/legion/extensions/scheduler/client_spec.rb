@@ -55,25 +55,23 @@ module Legion
     end
   end
 
-  unless defined?(Legion::Data)
-    module Data
-      module Model
-        unless defined?(Function)
-          class Function
-            def self.[](_id) = nil
-            def values = { name: 'test_func' }
-          end
+  module Data
+    module Model
+      unless defined?(Legion::Data::Model::Function)
+        class Function
+          def self.[](_id) = nil
+          def values = { name: 'test_func' }
         end
+      end
 
-        unless defined?(Schedule)
-          class Schedule # rubocop:disable Lint/EmptyClass
-          end
+      unless defined?(Legion::Data::Model::Schedule)
+        class Schedule # rubocop:disable Lint/EmptyClass
         end
+      end
 
-        unless defined?(ScheduleLog)
-          class ScheduleLog
-            def self.insert(**); end
-          end
+      unless defined?(Legion::Data::Model::ScheduleLog)
+        class ScheduleLog
+          def self.insert(**); end
         end
       end
     end
@@ -99,32 +97,14 @@ module Legion
     end
   end
 
-  unless defined?(Legion::Transport)
-    module Transport
-      module Messages
-        unless defined?(Dynamic)
-          class Dynamic
-            def initialize(**); end
-            def publish; end
-          end
+  module Transport
+    module Messages
+      unless defined?(Legion::Transport::Messages::Dynamic)
+        class Dynamic
+          def initialize(**); end
+          def publish; end
         end
       end
-    end
-  end
-
-  unless defined?(Legion::JSON)
-    module JSON
-      def self.load(str)
-        ::JSON.parse(str, symbolize_names: true)
-      rescue StandardError
-        {}
-      end
-    end
-  end
-
-  unless defined?(Legion::Logging)
-    module Logging
-      def self.debug(*); end
     end
   end
 end

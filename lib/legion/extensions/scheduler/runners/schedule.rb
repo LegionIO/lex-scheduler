@@ -42,7 +42,7 @@ module Legion
                         function_id:    row.values[:function_id],
                         expiration:     row.values[:task_ttl],
                         function:       function.values[:name],
-                        **Legion::JSON.load(row.values[:payload]))
+                        **json_load(row.values[:payload]))
 
               models_class::ScheduleLog.insert(
                 schedule_id: row.values[:id],
