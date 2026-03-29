@@ -52,7 +52,7 @@ module Legion
             Legion::Cache.get('scheduler_operating_mode') || 'active'
           end
 
-          def execute_mode_change(from:, to:)
+          def execute_mode_change(_from:, to:)
             Legion::Cache.set('scheduler_operating_mode', to, 3600)
           end
         end
