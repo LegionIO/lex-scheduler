@@ -23,25 +23,25 @@ module Legion
           end
 
           def emergency_event?(event_type)
-            return false unless event_type
+            return false unless event_type # rubocop:disable Legion/Extension/RunnerReturnHash
 
             patterns = emergency_patterns
             patterns.any? { |pattern| event_type.to_s.include?(pattern) }
           end
 
           def emergency_patterns
-            return settings.dig(:scheduler, :emergency_patterns) if settings.dig(:scheduler, :emergency_patterns)
+            return settings.dig(:scheduler, :emergency_patterns) if settings.dig(:scheduler, :emergency_patterns) # rubocop:disable Legion/Extension/RunnerReturnHash
 
             EMERGENCY_PATTERNS
           end
 
           def fetch_current_mode
-            Legion::Cache.get('scheduler_operating_mode') || 'active'
+            cache_get('scheduler_operating_mode') || 'active'
           end
 
           def execute_emergency_promotion(from:, event_type:)
-            Legion::Cache.set('scheduler_operating_mode', 'active', 3600)
-            Legion::Logging.send(:warn, "Emergency promotion to active from #{from} due to #{event_type}") if defined?(Legion::Logging)
+            cache_set('scheduler_operating_mode', 'active', 3600)
+            log.warn("Emergency promotion to active from #{from} due to #{event_type}")
           end
         end
       end

@@ -4,7 +4,7 @@ module Legion
   module Extensions
     module Scheduler
       module Actor
-        class ScheduleTask < Legion::Extensions::Actors::Every
+        class ScheduleTask < Legion::Extensions::Actors::Every # rubocop:disable Legion/Extension/EveryActorRequiresTime
           def runner_function
             'push_refresh'
           end

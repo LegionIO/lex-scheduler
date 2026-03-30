@@ -19,7 +19,7 @@ module Legion
         end
 
         def log
-          @log ||= defined?(Legion::Logging) ? Legion::Logging : Logger.new($stdout)
+          @log ||= Legion::Logging
         end
 
         def settings
