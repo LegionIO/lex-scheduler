@@ -31,16 +31,16 @@ module Legion
           end
 
           def critical_tasks_running?
-            count = Legion::Cache.get('scheduler_critical_task_count')
+            count = cache_get('scheduler_critical_task_count')
             count.is_a?(Integer) ? count.positive? : false
           end
 
           def fetch_current_mode
-            Legion::Cache.get('scheduler_operating_mode') || 'active'
+            cache_get('scheduler_operating_mode') || 'active'
           end
 
           def execute_transition(_from:, to:)
-            Legion::Cache.set('scheduler_operating_mode', to, 3600)
+            cache_set('scheduler_operating_mode', to, 3600)
           end
         end
       end

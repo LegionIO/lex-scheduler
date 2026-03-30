@@ -62,7 +62,7 @@ module Legion
               payload[thing] = opts[thing] if opts.key? thing
             end
 
-            return Legion::Transport::Messages::Dynamic.new(**opts).publish if opts[:transformation].nil?
+            return Legion::Transport::Messages::Dynamic.new(**opts).publish if opts[:transformation].nil? # rubocop:disable Legion/Extension/RunnerReturnHash
 
             payload[:exchange] = 'task'
             payload[:routing_key] = 'task.subtask.transform'

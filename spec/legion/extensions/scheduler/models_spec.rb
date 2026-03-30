@@ -37,11 +37,11 @@ end
 
 # Define Sequel models against the in-memory DB
 module SchedulerModels
-  class Schedule < Sequel::Model(DB[:schedules])
+  class Schedule < Sequel::Model(DB[:schedules]) # rubocop:disable Legion/Framework/EagerSequelModel
     one_to_many :schedule_logs, class: 'SchedulerModels::ScheduleLog'
   end
 
-  class ScheduleLog < Sequel::Model(DB[:schedule_logs])
+  class ScheduleLog < Sequel::Model(DB[:schedule_logs]) # rubocop:disable Legion/Framework/EagerSequelModel
     many_to_one :schedule, class: 'SchedulerModels::Schedule'
   end
 end

@@ -27,7 +27,7 @@ module Legion
           end
 
           def mode_schedule
-            return settings.dig(:scheduler, :mode_schedule) if settings.dig(:scheduler, :mode_schedule)
+            return settings.dig(:scheduler, :mode_schedule) if settings.dig(:scheduler, :mode_schedule) # rubocop:disable Legion/Extension/RunnerReturnHash
 
             default_mode_schedule
           end
@@ -43,17 +43,17 @@ module Legion
 
           def determine_mode(hour, schedule)
             schedule.each do |mode, hours|
-              return mode.to_s if hours.include?(hour)
+              return mode.to_s if hours.include?(hour) # rubocop:disable Legion/Extension/RunnerReturnHash
             end
             nil
           end
 
           def fetch_current_mode
-            Legion::Cache.get('scheduler_operating_mode') || 'active'
+            cache_get('scheduler_operating_mode') || 'active'
           end
 
           def execute_mode_change(_from:, to:)
-            Legion::Cache.set('scheduler_operating_mode', to, 3600)
+            cache_set('scheduler_operating_mode', to, 3600)
           end
         end
       end

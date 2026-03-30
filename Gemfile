@@ -16,6 +16,7 @@ group :test do
   gem 'rake'
   gem 'rspec', '~> 3.13'
   gem 'rubocop', '~> 1.75'
+  gem 'rubocop-legion', '~> 0.1', require: false
   gem 'sequel'
   gem 'simplecov'
   gem 'sqlite3'
