@@ -25,9 +25,9 @@ Sequel::Model.db = SCHEDULER_SPEC_DB
   SCHEDULER_SPEC_DB.create_table(table.to_sym) { primary_key :id }
 end
 data_migrations = File.join(Gem.loaded_specs.fetch('legion-data').full_gem_path, 'lib/legion/data/migrations')
-%w[004_add_extensions 005_add_runners 006_add_functions 008_add_tasks 009_add_digital_workers 031_add_task_depth
+%w[004_add_extensions 005_add_runners 006_add_functions 008_add_tasks 009_add_digital_workers 021_add_archive_tables 031_add_task_depth
    032_add_task_cancelled_at 033_add_task_delay 075_add_task_idempotency
-   139_add_task_execution 140_create_task_attempts 141_create_task_dispatches].each do |migration|
+   139_add_task_execution 140_create_task_attempts 141_create_task_dispatches 144_add_task_execution_policy].each do |migration|
   load File.join(data_migrations, "#{migration}.rb")
   Sequel::Migration.descendants.pop.apply(SCHEDULER_SPEC_DB, :up)
 end

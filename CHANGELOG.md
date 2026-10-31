@@ -12,7 +12,8 @@
 - `last_run` records the logical occurrence cursor, not broker delivery or runner completion.
 - Scheduler dispatch is exclusively via the lex-tasker durable outbox relay; direct submissions require `idempotency_key:`.
 - Standalone parser injection now controls schedule parsing; all runners use settings/logging/cache helpers and return Hashes.
-- Require legion-settings 1.5.0, legion-data 1.11.0 and lex-tasker 0.4.0.
+- Require legion-settings 1.4.3, legion-data 1.11.0 with migration 144, legion-transport 1.4.32, and lex-tasker 0.4.0.
+- Keep ancestry bounds in Scheduler-local settings; use immutable Transport task-protocol and Scheduler occurrence identities so local settings cannot reinterpret durable outcomes.
 
 ### Removed
 - Obsolete no-op refresh actor/message/queue and custom SendTask message; canonical task envelopes serve both direct and transform routes.

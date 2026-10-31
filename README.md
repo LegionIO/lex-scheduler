@@ -8,7 +8,7 @@ Durable cron and interval scheduling for [LegionIO](https://github.com/LegionIO/
 gem install lex-scheduler
 ```
 
-Requires Ruby 3.4+, legion-settings 1.5.0+, legion-data 1.11.0+, and lex-tasker 0.4.0+. Run Legion's normal data and extension migrations before starting actors. Migration `007_schedule_occurrences` adds new tables/columns without modifying published migrations. Scheduler and task persistence must use the **same database connection**. Enable the Tasker outbox relay; a stopped relay leaves durable work pending rather than losing it. No broker or cache is required merely to record schedules. Cache-backed leader election, when available, is only an optimization: database compare-and-swap and unique occurrence keys prevent two scheduler processes from recording the same occurrence.
+Requires Ruby 3.4+, legion-settings 1.4.3+, legion-data 1.11.0+, legion-transport 1.4.32+, and lex-tasker 0.4.0+. Run Data migrations through 144 and Legion's normal extension migrations before starting actors. Data 144 persists each task's execution-policy snapshot; migration `007_schedule_occurrences` adds scheduler tables/columns without modifying published migrations. Scheduler and task persistence must use the **same database connection**. Enable the Tasker outbox relay; a stopped relay leaves durable work pending rather than losing it. No broker or cache is required merely to record schedules. Cache-backed leader election, when available, is only an optimization: database compare-and-swap and unique occurrence keys prevent two scheduler processes from recording the same occurrence.
 
 `Actor::RunScheduler` polls `Runners::Schedule#schedule_tasks`. It does not run through the ordinary task runner because scheduling is orchestration, not execution of the target task.
 
@@ -31,7 +31,7 @@ Metadata is not authentication. Protected internal Subscription actors must expl
 
 Optional fields:
 
-- `transformation`: template sent to lex-transformer using the configured transform route; empty values use direct dispatch. ERB runs trusted code and is not a sandbox. Transformer engine policy applies.
+- `transformation`: template sent to lex-transformer using the canonical transform route; empty values use direct dispatch. ERB runs trusted code and is not a sandbox. Transformer engine policy applies.
 - `task_ttl`: broker message expiration in milliseconds; use `context.deadline_at` for an absolute execution deadline, including time spent waiting in the outbox.
 - `interval_basis`, `overlap_policy`, `misfire_policy`: per-schedule overrides of the defaults below.
 - `definition_version`: increment when materially changing a definition; it participates in the stable occurrence key. Changing a definition does not clear unfinished work or bypass overlap protection.
@@ -50,11 +50,13 @@ Settings live under `extensions.scheduler`; all defaults are exposed by `Legion:
 | `misfire_policy` | `coalesce` | `coalesce`: record only the latest due slot. `catch_up`: oldest missed slots first, bounded per poll. `skip`: advance the latest missed slot without executing if older than the grace period |
 | `misfire_grace_seconds` | `60` | Maximum lateness accepted by `skip` |
 | `max_catch_up` | `100` | Maximum missed slots considered in a catch-up poll; overlap protection may limit this to one |
-| `occurrence_statuses` | `recorded: schedule.recorded`, `delivered: schedule.delivered`, `skipped: schedule.skipped` | Scheduler bookkeeping status names; task outcomes use shared canonical statuses |
+| `execution.max_depth` | `100` | Local bound on descendant traversal when reconciling multiplied tasks; does not redefine terminal outcomes |
 
 Unsupported policies are errors, not fallback behavior. A completed-based interval uses terminal outcomes (including failure), not only successful completions. A transformed single output retains the occurrence's task ID; multiplied output waits for every descendant target task before the interval restarts. An `unknown` outcome is explicitly recorded but blocks completion/overlap: ambiguous external effects must be reconciled, not blindly repeated. Disabling a schedule stops new occurrences while existing task outcomes continue to be reconciled.
 
-Shared `task_execution` settings define canonical task statuses/routes/message types, metadata fields, depth bounds, publication confirmation and outbox retry/lease behavior. Scheduler emits the configured `dynamic` and `transform` message types; Tasker owns their publication.
+Settings are dynamic process-local policy, not distributed storage. `Legion::Transport::TaskProtocol` owns immutable task statuses, terminal recognition, routes, message types, protocol version, and metadata fields. Scheduler emits canonical `dynamic` and `transform` intents; Tasker owns publication using Transport's `transport.task_publication` defaults. Scheduler bookkeeping identities (`schedule.recorded`, `schedule.delivered`, `schedule.skipped`) are fixed in `Legion::Extensions::Scheduler::OCCURRENCE_STATUSES`, not configurable.
+
+Data owns persisted task/dispatch lifecycle identities and the task's execution-policy snapshot. Stored leases, retry timestamps, idempotency expiry, completion state, and occurrence identity remain authoritative when another process has different local settings. Scheduler-local ancestry, polling, scheduling, and misfire bounds may vary without changing interpretation of durable state.
 
 ## Delivery versus completion
 

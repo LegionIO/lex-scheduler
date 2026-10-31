@@ -34,7 +34,7 @@ module Legion
               values: schedule_task_values(options: options), idempotency_key: idempotency_key,
               dispatch: { event_key: "#{idempotency_key}:dispatch", message_type: schedule_message_type(options: options), options: options }
             )
-            { success: true, created: task[:created], task: task[:task], status: settings[:occurrence_statuses][:recorded] }
+            { success: true, created: task[:created], task: task[:task], status: Legion::Extensions::Scheduler::OCCURRENCE_STATUSES.fetch(:recorded) }
           end
 
           private
@@ -75,7 +75,7 @@ module Legion
 
             occurrence_id = db[:schedule_occurrences].insert(
               schedule_id: schedule[:id], occurrence_key: key, scheduled_at: scheduled_at, recorded_at: now,
-              status: settings[:occurrence_statuses][skipped ? :skipped : :recorded]
+              status: Legion::Extensions::Scheduler::OCCURRENCE_STATUSES.fetch(skipped ? :skipped : :recorded)
             )
             unless skipped
               args = schedule_json_hash(value: schedule[:payload], field: :payload)
@@ -90,7 +90,7 @@ module Legion
                                                            options: options, task_id: task_id)
               db[:schedule_occurrences].where(id: occurrence_id).update(task_id: task_id)
               db[:schedule_logs].insert(schedule_id: schedule[:id], task_id: task_id, function_id: schedule[:function_id],
-                                        success: nil, status: settings[:occurrence_statuses][:recorded], created: now)
+                                        success: nil, status: Legion::Extensions::Scheduler::OCCURRENCE_STATUSES.fetch(:recorded), created: now)
             end
             db[:schedules].where(id: schedule[:id]).update(last_run: scheduled_at, updated: now)
             log.debug("Schedule #{schedule[:id]} occurrence #{occurrence_id} #{skipped ? 'skipped' : 'recorded; publication pending'}")
@@ -102,7 +102,7 @@ module Legion
               dispatch = db[:task_dispatches].where(task_id: occurrence[:task_id]).exclude(delivered_at: nil).first
               if dispatch && !occurrence[:delivered_at]
                 updates[:delivered_at] = dispatch[:delivered_at]
-                updates[:status] = settings[:occurrence_statuses][:delivered]
+                updates[:status] = Legion::Extensions::Scheduler::OCCURRENCE_STATUSES.fetch(:delivered)
                 log.debug("Schedule #{schedule_id} occurrence #{occurrence[:id]} delivered")
               end
               outcome = schedule_task_outcome(task_id: occurrence[:task_id], db: db, depth: 0)

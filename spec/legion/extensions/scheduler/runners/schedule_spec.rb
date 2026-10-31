@@ -80,6 +80,21 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
     end
   end
 
+  it 'records canonical dispatch and occurrence identities despite obsolete local overrides' do
+    create_schedule(transformation: '{"value": 7}', context: Legion::JSON.dump({ correlation_id: 'trace' }))
+    Legion::Settings.with_overlay(task_execution: { statuses: { transformer_queued: 'local.queued' },
+                                                  routes: { transform: 'local.transform' }, message_types: { transform: 'local.transform' },
+                                                  protocol: { metadata_fields: [:untrusted] } },
+                                  extensions:     { scheduler: { occurrence_statuses: { recorded: 'local.recorded' } } }) do
+      expect(client.schedule_tasks(now: now)).to include(success: true, recorded: 1)
+    end
+    expect(db[:tasks].first[:status]).to eq('transformer.queued')
+    expect(db[:schedule_occurrences].first[:status]).to eq('schedule.recorded')
+    dispatch = db[:task_dispatches].first
+    expect(dispatch[:message_type]).to eq('transform')
+    expect(Legion::JSON.load(dispatch[:options])).to include(routing_key: 'task.subtask.transform', correlation_id: 'trace')
+  end
+
   it 'rolls back occurrence, task and cursor if durable intent recording fails' do
     schedule_id = create_schedule
     allow(Legion::Data::TaskExecution).to receive(:enqueue_dispatch).and_raise(Sequel::DatabaseError, 'storage unavailable')
@@ -115,21 +130,26 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
     client.schedule_tasks(now: now)
     dispatch = Legion::Data::TaskExecution.claim_dispatches(owner: 'publisher').first
     Legion::Data::TaskExecution.ack_dispatch(dispatch_id: dispatch[:id], token: dispatch[:token])
-    client.schedule_tasks(now: now)
+    Legion::Settings.with_overlay(extensions: { scheduler: { occurrence_statuses: { delivered: 'local.delivered' } } }) do
+      client.schedule_tasks(now: now)
+    end
+    expect(db[:schedule_occurrences].first[:status]).to eq('schedule.delivered')
     expect(db[:schedule_occurrences].first[:delivered_at]).not_to be_nil
     expect(db[:schedule_occurrences].first[:completed_at]).to be_nil
     expect(db[:schedule_logs].where(success: true).count).to eq(0)
   end
 
-  it 'starts a completed-based interval from the persisted terminal outcome rather than dispatch' do
+  it 'recognizes persisted completion despite different local lifecycle settings' do
     create_schedule(interval_basis: 'completed')
     client.schedule_tasks(now: now)
     expect(client.schedule_tasks(now: now + 600)[:recorded]).to eq(0)
     task_id = db[:tasks].first[:id]
     complete_task(task_id: task_id)
     finished_at = db[:tasks][id: task_id][:completed_at]
-    expect(client.schedule_tasks(now: finished_at + 59)[:recorded]).to eq(0)
-    expect(client.schedule_tasks(now: finished_at + 60)[:recorded]).to eq(1)
+    Legion::Settings.with_overlay(task_execution: { statuses: { completed: 'local.completed' }, terminal_statuses: [] }) do
+      expect(client.schedule_tasks(now: finished_at + 59)[:recorded]).to eq(0)
+      expect(client.schedule_tasks(now: finished_at + 60)[:recorded]).to eq(1)
+    end
     expect(db[:schedule_occurrences].order(:id).first[:completed_at]).to eq(finished_at)
   end
 
@@ -143,6 +163,27 @@ RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
     complete_task(task_id: child[:id])
     finished_at = db[:tasks][id: child[:id]][:completed_at]
     expect(client.schedule_tasks(now: finished_at + 60)[:recorded]).to eq(1)
+  end
+
+  it 'bounds ancestry traversal with current scheduler-local policy without changing persisted outcomes' do
+    create_schedule(interval_basis: 'completed')
+    client.schedule_tasks(now: now)
+    parent = db[:tasks].first
+    child = Legion::Data::TaskExecution.create_task(values: { parent_id: parent[:id] }, idempotency_key: 'child')[:task]
+    grandchild = Legion::Data::TaskExecution.create_task(values: { parent_id: child[:id] }, idempotency_key: 'grandchild')[:task]
+    complete_task(task_id: parent[:id], status: :multiplied)
+    complete_task(task_id: child[:id], status: :multiplied)
+    complete_task(task_id: grandchild[:id])
+    finished_at = db[:tasks][id: grandchild[:id]][:completed_at]
+
+    Legion::Settings.with_overlay(extensions: { scheduler: { execution: { max_depth: 1 } } }) do
+      expect(client.schedule_tasks(now: finished_at + 60)).to include(success: false, recorded: 0)
+    end
+    expect(db[:schedule_occurrences].first[:completed_at]).to be_nil
+    expect(db[:tasks][id: grandchild[:id]][:status]).to eq('task.completed')
+    Legion::Settings.with_overlay(extensions: { scheduler: { execution: { max_depth: 2 } } }) do
+      expect(client.schedule_tasks(now: finished_at + 60)).to include(success: true, recorded: 1)
+    end
   end
 
   it 'does not repeat ambiguous unknown external effects' do

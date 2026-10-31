@@ -15,7 +15,7 @@ module Legion
         module Schedule
           include Legion::Logging::Helper
           include Legion::Settings::Helper
-          include Legion::Settings::TaskExecution::Helper
+          include Legion::Transport::TaskProtocol::Helper
           include Legion::Data::Helper
           include Legion::JSON::Helper
 
@@ -112,7 +112,7 @@ module Legion
             function = Legion::Data::Model::Function[function_id]
             raise ArgumentError, "schedule target function #{function_id.inspect} does not exist" unless function
 
-            metadata = task_execution_settings[:protocol][:metadata_fields].map(&:to_sym)
+            metadata = Legion::Transport::TaskProtocol::METADATA_FIELDS
             options = context.each_with_object({}) do |(key, value), selected|
               selected[key.to_sym] = value if metadata.include?(key.to_sym)
             end
@@ -139,7 +139,7 @@ module Legion
           end
 
           def schedule_message_type(options:)
-            task_execution_settings.fetch(:message_types).fetch(options.key?(:transformation) ? :transform : :dynamic)
+            Legion::Transport::TaskProtocol::MESSAGE_TYPES.fetch(options.key?(:transformation) ? :transform : :dynamic)
           end
 
           def schedule_outstanding?(schedule_id:, db:)
@@ -147,7 +147,7 @@ module Legion
           end
 
           def schedule_task_outcome(task_id:, db:, depth:)
-            raise ArgumentError, 'task fanout ancestry exceeds configured maximum depth' if depth > task_execution_settings[:execution][:max_depth]
+            raise ArgumentError, 'task fanout ancestry exceeds configured maximum depth' if depth > settings.fetch(:execution).fetch(:max_depth)
 
             task = db[:tasks][id: task_id]
             return unless task && task[:completed_at] && task_terminal_status?(status: task[:status])
