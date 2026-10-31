@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0] - 2026-10-30
+
+### Added
+- Atomic schedule occurrence claims with durable task/outbox creation in migration 007.
+- Configurable interval basis, overlap and bounded misfire policies; completion tracking reads persisted task outcomes, including transformed fanout.
+- Canonical metadata in a separate schedule `context` field, preserving business payloads without allowing target overrides.
+- Real SQLite/task-substrate integration coverage for races, invalid definitions, rollback, recovery and completion.
+
+### Changed
+- `last_run` records the logical occurrence cursor, not broker delivery or runner completion.
+- Scheduler dispatch is exclusively via the lex-tasker durable outbox relay; direct submissions require `idempotency_key:`.
+- Standalone parser injection now controls schedule parsing; all runners use settings/logging/cache helpers and return Hashes.
+- Require legion-settings 1.5.0, legion-data 1.11.0 and lex-tasker 0.4.0.
+
+### Removed
+- Obsolete no-op refresh actor/message/queue and custom SendTask message; canonical task envelopes serve both direct and transform routes.
+- Mock framework/spec scaffolding and tests that only restated implementation defaults.
+
 ## [0.3.4] - 2026-03-30
 
 ### Changed

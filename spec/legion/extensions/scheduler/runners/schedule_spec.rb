@@ -1,393 +1,184 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-require 'fugit'
-
-# Stub framework dependencies before loading the runner
-module Legion
-  module Extensions
-    module Helpers
-      module Transport; end unless defined?(Legion::Extensions::Helpers::Transport)
-      module Cache; end unless defined?(Legion::Extensions::Helpers::Cache)
-      module Data; end unless defined?(Legion::Extensions::Helpers::Data)
-      module Lex; end unless defined?(Legion::Extensions::Helpers::Lex)
-    end
-
-    module Scheduler
-      module Transport
-        module Messages
-          unless defined?(Refresh)
-            class Refresh
-              def initialize(**); end
-              def publish; end
-            end
-          end
-
-          unless defined?(SendTask)
-            class SendTask
-              def initialize(**); end
-              def publish; end
-            end
-          end
-        end
-      end
-    end
-  end
-
-  unless defined?(Legion::Cache)
-    module Cache
-      def self.set(*); end
-      def self.get(_key) = nil
-    end
-  end
-
-  unless defined?(Legion::Settings)
-    module Settings
-      def self.[](key)
-        @store ||= {}
-        @store[key]
-      end
-
-      def self.[]=(key, val)
-        @store ||= {}
-        @store[key] = val
-      end
-    end
-  end
-
-  module Data
-    module Model
-      unless defined?(Legion::Data::Model::Function)
-        class Function
-          def self.[](_id) = nil
-          def values = { name: 'test_func' }
-        end
-      end
-
-      unless defined?(Legion::Data::Model::Schedule)
-        class Schedule # rubocop:disable Lint/EmptyClass
-        end
-      end
-
-      unless defined?(Legion::Data::Model::ScheduleLog)
-        class ScheduleLog
-          def self.insert(**); end
-        end
-      end
-    end
-  end
-
-  module Transport
-    module Messages
-      unless defined?(Legion::Transport::Messages::Dynamic)
-        class Dynamic
-          def initialize(**); end
-          def publish; end
-        end
-      end
-    end
-  end
-end
-
-require 'json'
-
-# Stub Sequel constants used in the runner
-unless defined?(Sequel)
-  module Sequel
-    CURRENT_TIMESTAMP = :CURRENT_TIMESTAMP unless defined?(CURRENT_TIMESTAMP)
-    def self.lit(str) = str
-  end
-end
-
-require 'legion/extensions/scheduler/runners/schedule'
 
 RSpec.describe Legion::Extensions::Scheduler::Runners::Schedule do
-  let(:runner) do
-    klass = Class.new do
-      include Legion::Extensions::Scheduler::Runners::Schedule
+  subject(:client) { Legion::Extensions::Scheduler::Client.new }
 
-      def log
-        @log ||= Class.new { def debug(*); end }.new
-      end
-
-      def models_class
-        Legion::Data::Model
-      end
-    end
-    klass.new
+  let(:db) { SCHEDULER_SPEC_DB }
+  let(:now) { Time.utc(2026, 10, 30, 12) }
+  let(:function_id) do
+    extension_id = db[:extensions].insert(name: 'example', namespace: 'Legion::Extensions::Example', exchange: 'example')
+    runner_id = db[:runners].insert(extension_id: extension_id, name: 'jobs', namespace: 'Legion::Extensions::Example::Runners::Jobs')
+    db[:functions].insert(runner_id: runner_id, name: 'perform')
   end
 
-  before do
-    allow(Legion::Settings).to receive(:[]).with(:client).and_return({ name: 'test-node' })
+  def create_schedule(**values)
+    SCHEDULER_SPEC_DB[:schedules].insert({ name: 'recurring', function_id: function_id, interval: 60, created: now,
+                                         payload: Legion::JSON.dump({ value: 7 }) }.merge(values))
   end
 
-  describe '#push_refresh' do
-    it 'publishes a Refresh message' do
-      msg = instance_double(Legion::Extensions::Scheduler::Transport::Messages::Refresh, publish: nil)
-      allow(Legion::Extensions::Scheduler::Transport::Messages::Refresh).to receive(:new).and_return(msg)
-      runner.push_refresh
-      expect(Legion::Extensions::Scheduler::Transport::Messages::Refresh).to have_received(:new)
-    end
+  def complete_task(task_id:, status: :completed)
+    claim = Legion::Data::TaskExecution.claim_task(task_id: task_id, owner: 'scheduler-spec')
+    Legion::Data::TaskExecution.complete_task(task_id: task_id, token: claim[:token],
+                                              status: client.task_status(name: status), result: { success: status == :completed })
   end
 
-  describe '#refresh' do
-    it 'is a no-op (leadership enforced at actor level via Singleton mixin)' do
-      expect { runner.refresh }.not_to raise_error
+  it 'records only one logical occurrence, task and dispatch when two schedulers race' do
+    schedule_id = create_schedule
+    start = Queue.new
+    workers = Array.new(2) do
+      Thread.new do
+        start.pop
+        Legion::Extensions::Scheduler::Client.new.schedule_tasks(now: now)
+      end
     end
+    2.times { start << true }
+    results = workers.map(&:value)
+    expect(results).to all(include(success: true))
+    expect(db[:schedule_occurrences].where(schedule_id: schedule_id).count).to eq(1)
+    expect(db[:tasks].count).to eq(1)
+    expect(db[:task_dispatches].count).to eq(1)
+    expect(client.schedule_tasks(now: now)[:recorded]).to eq(0)
   end
 
-  describe '#send_task' do
-    context 'when no transformation is present' do
-      it 'publishes a Dynamic message directly' do
-        msg = instance_double(Legion::Transport::Messages::Dynamic, publish: nil)
-        allow(Legion::Transport::Messages::Dynamic).to receive(:new).and_return(msg)
-        runner.send_task(function: 'my_func', function_id: 1)
-        expect(Legion::Transport::Messages::Dynamic).to have_received(:new)
-      end
+  it 'fails closed on an invalid cron without advancing the cursor or creating an intent' do
+    schedule_id = create_schedule(interval: nil, cron: 'not a cron')
+    expect(client.schedule_tasks(now: now)).to include(success: false, recorded: 0)
+    expect(db[:schedules][id: schedule_id][:last_run]).to be_nil
+    expect(db[:schedule_occurrences].count).to eq(0)
+    expect(db[:task_dispatches].count).to eq(0)
+  end
 
-      it 'does not publish a SendTask message' do
-        msg = instance_double(Legion::Transport::Messages::Dynamic, publish: nil)
-        allow(Legion::Transport::Messages::Dynamic).to receive(:new).and_return(msg)
-        expect(Legion::Extensions::Scheduler::Transport::Messages::SendTask).not_to receive(:new)
-        runner.send_task(function: 'my_func', function_id: 1)
-      end
-    end
+  it 'rejects conflicting interval and cron definitions' do
+    create_schedule(cron: '* * * * *')
+    expect(client.schedule_tasks(now: now)).to include(success: false, recorded: 0)
+    expect(db[:tasks].count).to eq(0)
+  end
 
-    context 'when transformation is present' do
-      it 'publishes a SendTask message via transform routing' do
-        msg = instance_double(Legion::Extensions::Scheduler::Transport::Messages::SendTask, publish: nil)
-        allow(Legion::Extensions::Scheduler::Transport::Messages::SendTask).to receive(:new).and_return(msg)
-        runner.send_task(function: 'my_func', function_id: 1, transformation: '{"key":"<%= val %>"}')
-        expect(Legion::Extensions::Scheduler::Transport::Messages::SendTask).to have_received(:new)
-      end
+  it 'does not repeat the cron boundary when polling at the exact same instant' do
+    create_schedule(interval: nil, cron: '* * * * *', created: now - 60, overlap_policy: 'allow')
+    expect(client.schedule_tasks(now: now)[:recorded]).to eq(1)
+    expect(client.schedule_tasks(now: now)[:recorded]).to eq(0)
+    expect(db[:schedule_occurrences].first[:scheduled_at]).to eq(now)
+  end
 
-      it 'sets routing_key to task.subtask.transform' do
-        msg = instance_double(Legion::Extensions::Scheduler::Transport::Messages::SendTask, publish: nil)
-        allow(Legion::Extensions::Scheduler::Transport::Messages::SendTask).to receive(:new) do |**opts|
-          expect(opts[:routing_key]).to eq('task.subtask.transform')
-          msg
-        end
-        runner.send_task(function: 'my_func', function_id: 1, transformation: '{"key":"val"}')
-      end
-
-      it 'sets exchange to task' do
-        msg = instance_double(Legion::Extensions::Scheduler::Transport::Messages::SendTask, publish: nil)
-        allow(Legion::Extensions::Scheduler::Transport::Messages::SendTask).to receive(:new) do |**opts|
-          expect(opts[:exchange]).to eq('task')
-          msg
-        end
-        runner.send_task(function: 'my_func', function_id: 1, transformation: '{"key":"val"}')
-      end
-
-      it 'does not publish a Dynamic message' do
-        msg = instance_double(Legion::Extensions::Scheduler::Transport::Messages::SendTask, publish: nil)
-        allow(Legion::Extensions::Scheduler::Transport::Messages::SendTask).to receive(:new).and_return(msg)
-        expect(Legion::Transport::Messages::Dynamic).not_to receive(:new)
-        runner.send_task(function: 'my_func', function_id: 1, transformation: '{"key":"val"}')
-      end
-    end
-
-    it 'passes all opts (including extra keys) through to the Dynamic message' do
-      msg = instance_double(Legion::Transport::Messages::Dynamic, publish: nil)
-      allow(Legion::Transport::Messages::Dynamic).to receive(:new) do |**opts|
-        expect(opts).to have_key(:relationship_id)
-        expect(opts[:relationship_id]).to eq(99)
-        msg
-      end
-      runner.send_task(function: 'my_func', function_id: 1, relationship_id: 99)
+  [nil, '{"value": <%= value %>}'].each do |transformation|
+    it "keeps stored business input separate from authoritative target for #{transformation ? 'transform' : 'direct'} dispatch" do
+      payload = { function_id: 999, function: 'hijack', runner_class: 'Bad', task_id: 999, principal_id: 'admin', value: 7 }
+      context = { function_id: 999, function: 'hijack', runner_class: 'Bad', task_id: 999,
+                  principal_id: 'service-id', principal_type: 'service', tenant_id: 'tenant', correlation_id: 'trace',
+                  engine: 'erb', schema: { type: 'object' }, engine_options: { strict: true }, depth: 2 }
+      create_schedule(payload: Legion::JSON.dump(payload), context: Legion::JSON.dump(context), transformation: transformation)
+      expect(client.schedule_tasks(now: now)).to include(success: true, recorded: 1)
+      options = Legion::JSON.load(db[:task_dispatches].first[:options])
+      expect(options).to include(function_id: function_id, function: 'perform', args: payload, principal_id: 'service-id',
+                                 runner_class: 'Legion::Extensions::Example::Runners::Jobs', tenant_id: 'tenant', correlation_id: 'trace',
+                                 engine: 'erb', schema: { type: 'object' }, engine_options: { strict: true }, depth: 2)
+      expect(options[:task_id]).to eq(db[:tasks].first[:id])
+      expect(options[:occurrence_id]).to eq(db[:schedule_occurrences].first[:id])
     end
   end
 
-  describe '#schedule_tasks' do
-    # Leadership is now enforced at the actor level via Singleton mixin.
-    # The runner always executes when called — the actor decides whether to call it.
+  it 'rolls back occurrence, task and cursor if durable intent recording fails' do
+    schedule_id = create_schedule
+    allow(Legion::Data::TaskExecution).to receive(:enqueue_dispatch).and_raise(Sequel::DatabaseError, 'storage unavailable')
+    expect(client.schedule_tasks(now: now)).to include(success: false, recorded: 0)
+    expect(db[:schedules][id: schedule_id][:last_run]).to be_nil
+    expect(db[:schedule_occurrences].count).to eq(0)
+    expect(db[:tasks].count).to eq(0)
+  end
 
-    context 'when called' do
-      it 'queries for active schedules' do
-        expect(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([])
-        runner.schedule_tasks
-      end
-
-      context 'with an interval-based schedule that has not elapsed' do
-        let(:row) do
-          double('row', values: {
-                   interval:       60,
-                   cron:           nil,
-                   last_run:       Time.now - 10,
-                   function_id:    1,
-                   payload:        '{}',
-                   transformation: nil,
-                   task_ttl:       nil
-                 })
-        end
-
-        before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-        end
-
-        it 'skips the schedule' do
-          expect(runner).not_to receive(:send_task)
-          runner.schedule_tasks
-        end
-      end
-
-      context 'with an interval-based schedule whose interval has elapsed' do
-        let(:func) { double('function', values: { name: 'run_job' }) }
-        let(:row) do
-          double('row', values: {
-                   interval:       30,
-                   cron:           nil,
-                   last_run:       Time.now - 60,
-                   function_id:    1,
-                   payload:        '{}',
-                   transformation: nil,
-                   task_ttl:       nil
-                 })
-        end
-
-        before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
-          allow(row).to receive(:update)
-        end
-
-        it 'calls send_task' do
-          expect(runner).to receive(:send_task)
-          runner.schedule_tasks
-        end
-
-        it 'updates last_run after dispatching' do
-          allow(runner).to receive(:send_task)
-          expect(row).to receive(:update).with(last_run: Sequel::CURRENT_TIMESTAMP)
-          runner.schedule_tasks
-        end
-      end
-
-      context 'with a cron-based schedule' do
-        let(:func) { double('function', values: { name: 'cron_job' }) }
-
-        it 'skips when last_run is after the previous cron time' do
-          # A schedule that just ran - last_run is very recent
-          row = double('row', values: {
-                         interval:       nil,
-                         cron:           '*/5 * * * *',
-                         last_run:       Time.now,
-                         function_id:    1,
-                         payload:        '{}',
-                         transformation: nil,
-                         task_ttl:       nil
-                       })
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-          expect(runner).not_to receive(:send_task)
-          runner.schedule_tasks
-        end
-
-        it 'dispatches when last_run is before the previous cron time' do
-          func = double('function', values: { name: 'cron_job' })
-          # last_run is long ago, so previous cron time has passed since then
-          row = double('row', values: {
-                         interval:       nil,
-                         cron:           '*/5 * * * *',
-                         last_run:       Time.now - 3600,
-                         function_id:    1,
-                         payload:        '{}',
-                         transformation: nil,
-                         task_ttl:       nil
-                       })
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
-          allow(row).to receive(:update)
-          allow(Legion::Data::Model::ScheduleLog).to receive(:insert)
-          expect(runner).to receive(:send_task)
-          runner.schedule_tasks
-        end
-      end
-
-      context 'with a schedule that has nil last_run (new schedule)' do
-        let(:func) { double('function', values: { name: 'new_job' }) }
-        let(:row) do
-          double('row', values: {
-                   interval:       60,
-                   cron:           nil,
-                   last_run:       nil,
-                   function_id:    1,
-                   payload:        '{}',
-                   transformation: nil,
-                   task_ttl:       nil
-                 })
-        end
-
-        before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
-          allow(row).to receive(:update)
-          allow(Legion::Data::Model::ScheduleLog).to receive(:insert)
-          allow(runner).to receive(:send_task)
-        end
-
-        it 'dispatches without crashing' do
-          expect { runner.schedule_tasks }.not_to raise_error
-        end
-
-        it 'calls send_task' do
-          expect(runner).to receive(:send_task)
-          runner.schedule_tasks
-        end
-      end
-
-      context 'with a schedule whose function_id returns nil' do
-        let(:row) do
-          double('row', values: {
-                   interval:       60,
-                   cron:           nil,
-                   last_run:       Time.now - 120,
-                   function_id:    999,
-                   payload:        '{}',
-                   transformation: nil,
-                   task_ttl:       nil
-                 })
-        end
-
-        before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-          allow(Legion::Data::Model::Function).to receive(:[]).with(999).and_return(nil)
-        end
-
-        it 'skips the schedule without crashing' do
-          expect(runner).not_to receive(:send_task)
-          expect { runner.schedule_tasks }.not_to raise_error
-        end
-      end
-
-      context 'with an interval-based schedule that dispatches' do
-        let(:func) { double('function', values: { name: 'run_job' }) }
-        let(:row) do
-          double('row', values: {
-                   interval:       30,
-                   cron:           nil,
-                   last_run:       Time.now - 60,
-                   function_id:    1,
-                   payload:        '{}',
-                   transformation: nil,
-                   task_ttl:       nil,
-                   id:             42
-                 })
-        end
-
-        before do
-          allow(Legion::Data::Model::Schedule).to receive(:where).with(active: true).and_return([row])
-          allow(Legion::Data::Model::Function).to receive(:[]).with(1).and_return(func)
-          allow(row).to receive(:update)
-          allow(runner).to receive(:send_task)
-        end
-
-        it 'writes a ScheduleLog entry after dispatching' do
-          expect(Legion::Data::Model::ScheduleLog).to receive(:insert).with(
-            hash_including(schedule_id: 42, function_id: 1, success: true, status: 'dispatched')
-          )
-          runner.schedule_tasks
-        end
-      end
+  it 'keeps rejected dispatch pending and recoverable without recording delivery or completion' do
+    create_schedule
+    client.schedule_tasks(now: now)
+    relay = Object.new.extend(Legion::Extensions::Tasker::Runners::Outbox)
+    Legion::Settings.with_overlay(transport: { messages: { encrypt: false } }) do
+      expect(relay.dispatch_pending(owner: 'publisher')).to include(success: false, released: 1, delivered: 0)
     end
+    expect(client.schedule_tasks(now: now + 120)[:recorded]).to eq(0)
+    expect(db[:schedule_occurrences].first).to include(delivered_at: nil, completed_at: nil)
+    expect(db[:schedule_logs].first[:success]).to be_nil
+    channel = Legion::Transport::Connection.channel
+    queue = channel.queue_declare_without_recording_topology('scheduler-spec')
+    queue.bind('example', routing_key: 'example.jobs.perform')
+    Legion::Settings.with_overlay(transport: { messages: { encrypt: false } }) do
+      expect(relay.dispatch_pending(owner: 'recovery')).to include(success: true, delivered: 1, released: 0)
+    end
+    client.schedule_tasks(now: now)
+    expect(db[:schedule_occurrences].first[:delivered_at]).not_to be_nil
+    expect(db[:tasks].count).to eq(1)
+  end
+
+  it 'tracks accepted publication separately from actual task completion' do
+    create_schedule
+    client.schedule_tasks(now: now)
+    dispatch = Legion::Data::TaskExecution.claim_dispatches(owner: 'publisher').first
+    Legion::Data::TaskExecution.ack_dispatch(dispatch_id: dispatch[:id], token: dispatch[:token])
+    client.schedule_tasks(now: now)
+    expect(db[:schedule_occurrences].first[:delivered_at]).not_to be_nil
+    expect(db[:schedule_occurrences].first[:completed_at]).to be_nil
+    expect(db[:schedule_logs].where(success: true).count).to eq(0)
+  end
+
+  it 'starts a completed-based interval from the persisted terminal outcome rather than dispatch' do
+    create_schedule(interval_basis: 'completed')
+    client.schedule_tasks(now: now)
+    expect(client.schedule_tasks(now: now + 600)[:recorded]).to eq(0)
+    task_id = db[:tasks].first[:id]
+    complete_task(task_id: task_id)
+    finished_at = db[:tasks][id: task_id][:completed_at]
+    expect(client.schedule_tasks(now: finished_at + 59)[:recorded]).to eq(0)
+    expect(client.schedule_tasks(now: finished_at + 60)[:recorded]).to eq(1)
+    expect(db[:schedule_occurrences].order(:id).first[:completed_at]).to eq(finished_at)
+  end
+
+  it 'waits for every multiplied child before completing a scheduled occurrence' do
+    create_schedule(interval_basis: 'completed')
+    client.schedule_tasks(now: now)
+    parent = db[:tasks].first
+    child = Legion::Data::TaskExecution.create_task(values: { parent_id: parent[:id], function_id: function_id }, idempotency_key: 'fanout-child')[:task]
+    complete_task(task_id: parent[:id], status: :multiplied)
+    expect(client.schedule_tasks(now: Time.now + 600)[:recorded]).to eq(0)
+    complete_task(task_id: child[:id])
+    finished_at = db[:tasks][id: child[:id]][:completed_at]
+    expect(client.schedule_tasks(now: finished_at + 60)[:recorded]).to eq(1)
+  end
+
+  it 'does not repeat ambiguous unknown external effects' do
+    create_schedule(interval_basis: 'completed')
+    client.schedule_tasks(now: now)
+    complete_task(task_id: db[:tasks].first[:id], status: :unknown)
+    expect(client.schedule_tasks(now: Time.now + 600)[:recorded]).to eq(0)
+    expect(db[:schedule_occurrences].first[:completed_at]).to be_nil
+    expect(db[:schedule_occurrences].first[:status]).to eq(client.task_status(name: :unknown))
+  end
+
+  it 'coalesces missed scheduled intervals to the latest slot' do
+    create_schedule(created: now - 600, overlap_policy: 'allow')
+    expect(client.schedule_tasks(now: now)[:recorded]).to eq(1)
+    expect(db[:schedule_occurrences].first[:scheduled_at]).to eq(now)
+  end
+
+  it 'bounds catch-up and preserves remaining slots for later polls' do
+    create_schedule(created: now - 180, overlap_policy: 'allow', misfire_policy: 'catch_up')
+    Legion::Settings.with_overlay(extensions: { scheduler: { max_catch_up: 2 } }) do
+      expect(client.schedule_tasks(now: now)[:recorded]).to eq(2)
+      expect(client.schedule_tasks(now: now)[:recorded]).to eq(2)
+    end
+    expect(db[:schedule_occurrences].order(:scheduled_at).select_map(:scheduled_at)).to eq([now - 180, now - 120, now - 60, now])
+  end
+
+  it 'records an old skipped cron occurrence without creating a task' do
+    create_schedule(interval: nil, cron: '0 * * * *', created: now - 7200, misfire_policy: 'skip')
+    expect(client.schedule_tasks(now: now + 120)).to include(recorded: 0, skipped: 1)
+    expect(db[:tasks].count).to eq(0)
+    expect(client.schedule_tasks(now: now + 121)).to include(recorded: 0, skipped: 0)
+  end
+
+  it 'rejects unsupported policies instead of falling through to dispatch' do
+    create_schedule(overlap_policy: 'replace')
+    expect(client.schedule_tasks(now: now)).to include(success: false, recorded: 0)
+    expect(db[:tasks].count).to eq(0)
   end
 end

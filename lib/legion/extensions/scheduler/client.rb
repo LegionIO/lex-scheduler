@@ -1,29 +1,25 @@
 # frozen_string_literal: true
 
-require 'fugit'
-require_relative 'runners/schedule'
+require 'legion/extensions/scheduler/runners/schedule'
 
 module Legion
   module Extensions
     module Scheduler
       class Client
-        include Runners::Schedule
+        include Legion::Extensions::Scheduler::Runners::Schedule
 
-        def initialize(data_model: nil, fugit: nil)
+        def initialize(data_model: nil, fugit: Fugit)
           @data_model = data_model
-          @fugit = fugit || Fugit
+          @fugit = fugit
+          Legion::Settings.loader.load_module_default(extensions: { scheduler: Legion::Extensions::Scheduler.default_settings })
         end
 
         def models_class
-          @data_model || Data::Model
+          @data_model || Legion::Extensions::Scheduler::Data::Model
         end
 
-        def log
-          @log ||= Legion::Logging
-        end
-
-        def settings
-          { options: {} }
+        def segments
+          [:scheduler]
         end
       end
     end
