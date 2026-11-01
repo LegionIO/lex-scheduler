@@ -7,7 +7,6 @@ module Legion
         # The instance time method resolves current settings instead of freezing a DSL literal at load time.
         class RunScheduler < Legion::Extensions::Actors::Every
           include Legion::Extensions::Actors::Singleton if defined?(Legion::Extensions::Actors::Singleton)
-          include Legion::Settings::Helper
 
           def time
             settings[:poll_interval_seconds]

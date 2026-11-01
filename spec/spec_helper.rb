@@ -52,12 +52,18 @@ RSpec.configure do |config|
   config.example_status_persistence_file_path = '.rspec_status'
   config.disable_monkey_patching!
   config.expect_with(:rspec) { |expectations| expectations.syntax = :expect }
+  config.before(:suite) do
+    # Standalone specs supply the settings mixin that LegionIO injects when building runners.
+    Legion::Extensions::Scheduler::Runners.constants(false).each do |name|
+      Legion::Extensions::Scheduler::Runners.const_get(name, false).include(Legion::Settings::Helper)
+    end
+  end
   config.before do
     Legion::Transport::Local.reset!
     %i[schedule_logs schedule_occurrences task_dispatches task_attempts schedules tasks functions runners extensions].each do |table|
       SCHEDULER_SPEC_DB[table].delete
     end
-    Legion::Settings.loader.load_module_default(extensions: { scheduler: Legion::Extensions::Scheduler.default_settings })
+    Legion::Settings[:extensions][:scheduler] = Legion::Extensions::Scheduler.default_settings
   end
   config.after(:suite) do
     Legion::Transport::Connection.shutdown

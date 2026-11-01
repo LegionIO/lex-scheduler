@@ -14,7 +14,6 @@ module Legion
       module Helpers
         module Schedule
           include Legion::Logging::Helper
-          include Legion::Settings::Helper
           include Legion::Transport::TaskProtocol::Helper
           include Legion::Data::Helper
           include Legion::JSON::Helper

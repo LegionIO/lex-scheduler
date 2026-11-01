@@ -10,7 +10,6 @@ module Legion
       module Helpers
         module Mode
           include Legion::Logging::Helper
-          include Legion::Settings::Helper
           include Legion::Cache::Helper
 
           private

@@ -8,7 +8,7 @@ Durable cron and interval scheduling for [LegionIO](https://github.com/LegionIO/
 gem install lex-scheduler
 ```
 
-Requires Ruby 3.4+, legion-settings 1.4.3+, legion-data 1.11.0+, legion-transport 1.4.32+, and lex-tasker 0.4.0+. Run Data migrations through 144 and Legion's normal extension migrations before starting actors. Data 144 persists each task's execution-policy snapshot; migration `007_schedule_occurrences` adds scheduler tables/columns without modifying published migrations. Scheduler and task persistence must use the **same database connection**. Enable the Tasker outbox relay; a stopped relay leaves durable work pending rather than losing it. No broker or cache is required merely to record schedules. Cache-backed leader election, when available, is only an optimization: database compare-and-swap and unique occurrence keys prevent two scheduler processes from recording the same occurrence.
+Requires Ruby 3.4+, legion-settings 1.4.5+, legion-data 1.11.0+, legion-transport 1.4.32+, and lex-tasker 0.4.0+. Run Data migrations through 144 and Legion's normal extension migrations before starting actors. Data 144 persists each task's execution-policy snapshot; migration `007_schedule_occurrences` adds scheduler tables/columns without modifying published migrations. Scheduler and task persistence must use the **same database connection**. Enable the Tasker outbox relay; a stopped relay leaves durable work pending rather than losing it. No broker or cache is required merely to record schedules. Cache-backed leader election, when available, is only an optimization: database compare-and-swap and unique occurrence keys prevent two scheduler processes from recording the same occurrence.
 
 `Actor::RunScheduler` polls `Runners::Schedule#schedule_tasks`. It does not run through the ordinary task runner because scheduling is orchestration, not execution of the target task.
 
@@ -40,7 +40,7 @@ New interval schedules are eligible at their creation time. New cron schedules w
 
 ## Scheduling policies
 
-Settings live under `extensions.scheduler`; all defaults are exposed by `Legion::Extensions::Scheduler.default_settings` and read through `Legion::Settings::Helper`.
+Settings live under `Legion::Settings[:extensions][:scheduler]`; defaults are registered at boot from `Legion::Extensions::Scheduler.default_settings`. Framework runners and actors use the automatically injected settings helper, so subsequent reads observe the live tree without reinstalling defaults.
 
 | Setting | Default | Behavior |
 |---|---|---|
@@ -79,7 +79,7 @@ client.send_task(function_id: 42, idempotency_key: 'request-123', args: { accoun
                  context: { principal_id: 'scheduler-service', principal_type: 'service' })
 ```
 
-`send_task` records durable work and returns a plain task Hash with `created: true/false`; replaying the same key does not enqueue again. It does not publish synchronously. `data_model:` can inject a scheduler model namespace backed by the same database; `fugit:` injects the actual parser used for due-time evaluation. Defaults are installed without overwriting user settings.
+`send_task` records durable work and returns a plain task Hash with `created: true/false`; replaying the same key does not enqueue again. It does not publish synchronously. `data_model:` can inject a scheduler model namespace backed by the same database; `fugit:` injects the actual parser used for due-time evaluation. Defaults are registered through Legion Settings during client initialization.
 
 ## Operating-mode runners
 

@@ -6,6 +6,7 @@ module Legion
   module Extensions
     module Scheduler
       class Client
+        include Legion::Settings::Helper
         include Legion::Extensions::Scheduler::Runners::Schedule
 
         def initialize(data_model: nil, fugit: Fugit)

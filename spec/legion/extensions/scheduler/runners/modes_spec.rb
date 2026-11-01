@@ -6,17 +6,9 @@ require 'legion/extensions/scheduler/runners/mode_scheduler'
 require 'legion/extensions/scheduler/runners/emergency_promotion'
 
 RSpec.describe 'Scheduler operating mode policy' do
-  let(:runner) do
-    Class.new do
-      include Legion::Extensions::Scheduler::Runners::ModeTransition
-      include Legion::Extensions::Scheduler::Runners::ModeScheduler
-      include Legion::Extensions::Scheduler::Runners::EmergencyPromotion
-
-      def segments
-        [:scheduler]
-      end
-    end.new
-  end
+  let(:runner) { Legion::Extensions::Scheduler::Runners::ModeTransition }
+  let(:mode_scheduler) { Legion::Extensions::Scheduler::Runners::ModeScheduler }
+  let(:emergency_promotion) { Legion::Extensions::Scheduler::Runners::EmergencyPromotion }
 
   before do
     Legion::Cache.setup
@@ -34,9 +26,19 @@ RSpec.describe 'Scheduler operating mode policy' do
   it 'uses configured hour and emergency policies rather than hardcoded active mode' do
     Legion::Settings.with_overlay(extensions: { scheduler: { mode_schedule: { active: [3] }, default_mode: 'maintenance',
                                                            emergency_mode: 'idle', emergency_patterns: ['priority'] } }) do
-      expect(runner.evaluate_mode(now: Time.utc(2026, 10, 30, 3))).to include(success: true, mode: 'active')
-      expect(runner.promote(event_type: 'priority-event')).to include(success: true, mode: 'idle')
+      expect(mode_scheduler.evaluate_mode(now: Time.utc(2026, 10, 30, 3))).to include(success: true, mode: 'active')
+      expect(emergency_promotion.promote(event_type: 'priority-event')).to include(success: true, mode: 'idle')
       expect(runner.cache_get('scheduler_operating_mode')).to eq('idle')
     end
+  end
+
+  it 'keeps configured modes restricted through client initialization and later live changes' do
+    Legion::Settings[:extensions][:scheduler][:modes] = ['idle']
+    Legion::Extensions::Scheduler::Client.new
+    expect { runner.transition(mode: 'active') }.to raise_error(ArgumentError, /unsupported scheduler mode/)
+
+    Legion::Settings[:extensions][:scheduler][:modes] = ['maintenance']
+    expect { runner.transition(mode: 'idle') }.to raise_error(ArgumentError, /unsupported scheduler mode/)
+    expect(runner.transition(mode: 'maintenance')).to include(success: true, changed: true, mode: 'maintenance')
   end
 end
