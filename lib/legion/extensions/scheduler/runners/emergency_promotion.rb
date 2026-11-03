@@ -1,47 +1,23 @@
 # frozen_string_literal: true
 
+require 'legion/extensions/scheduler/helpers/mode'
+
 module Legion
   module Extensions
     module Scheduler
       module Runners
         module EmergencyPromotion
-          include Legion::Extensions::Helpers::Transport
-          include Legion::Extensions::Helpers::Cache
-          include Legion::Extensions::Helpers::Data
-          include Legion::Extensions::Helpers::Lex
+          extend self # rubocop:disable Style/ModuleFunction -- Included helpers must also be callable on the runner module.
+          include Legion::Extensions::Scheduler::Helpers::Mode
 
-          EMERGENCY_PATTERNS = %w[extinction consent_violation].freeze
+          def promote(event_type:, **)
+            current = scheduler_current_mode
+            target = settings[:emergency_mode]
+            matches = settings[:emergency_patterns].any? { |pattern| event_type.to_s.include?(pattern) }
+            return { success: true, changed: false, mode: current } unless matches && current != target
 
-          def promote(**opts)
-            event_type = opts[:event_type] || opts['event_type']
-            return unless emergency_event?(event_type)
-
-            current_mode = fetch_current_mode
-            return if current_mode == 'active'
-
-            execute_emergency_promotion(from: current_mode, event_type: event_type)
-          end
-
-          def emergency_event?(event_type)
-            return false unless event_type # rubocop:disable Legion/Extension/RunnerReturnHash
-
-            patterns = emergency_patterns
-            patterns.any? { |pattern| event_type.to_s.include?(pattern) }
-          end
-
-          def emergency_patterns
-            return settings.dig(:scheduler, :emergency_patterns) if settings.dig(:scheduler, :emergency_patterns) # rubocop:disable Legion/Extension/RunnerReturnHash
-
-            EMERGENCY_PATTERNS
-          end
-
-          def fetch_current_mode
-            cache_get('scheduler_operating_mode') || 'active'
-          end
-
-          def execute_emergency_promotion(from:, event_type:)
-            cache_set('scheduler_operating_mode', 'active', 3600)
-            log.warn("Emergency promotion to active from #{from} due to #{event_type}")
+            log.warn("Scheduler emergency promotion due to #{event_type}")
+            scheduler_change_mode(from: current, to: target)
           end
         end
       end

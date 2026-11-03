@@ -4,20 +4,18 @@ source 'https://rubygems.org'
 
 gemspec
 
-gem 'legion-cache', '>= 1.3.11'
-gem 'legion-crypt', '>= 1.4.9'
-gem 'legion-data', '>= 1.4.17'
-gem 'legion-json', '>= 1.2.1'
-gem 'legion-logging', '>= 1.3.2'
-gem 'legion-settings', '>= 1.3.14'
-gem 'legion-transport', '>= 1.3.9'
+companion_root = File.expand_path('.ci-dependencies', __dir__)
+companion_root = File.expand_path('..', __dir__) unless Dir.exist?(companion_root)
+%w[legion-settings legion-data lex-tasker legion-transport].each do |name|
+  path = File.join(companion_root, name)
+  gem name, path: path if File.file?(File.join(path, "#{name}.gemspec"))
+end
 
 group :test do
   gem 'rake'
   gem 'rspec', '~> 3.13'
   gem 'rubocop', '~> 1.75'
   gem 'rubocop-legion', '~> 0.1', require: false
-  gem 'sequel'
   gem 'simplecov'
   gem 'sqlite3'
 end

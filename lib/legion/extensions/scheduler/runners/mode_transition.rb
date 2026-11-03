@@ -1,46 +1,26 @@
 # frozen_string_literal: true
 
+require 'legion/extensions/scheduler/helpers/mode'
+
 module Legion
   module Extensions
     module Scheduler
       module Runners
         module ModeTransition
-          include Legion::Extensions::Helpers::Transport
-          include Legion::Extensions::Helpers::Cache
-          include Legion::Extensions::Helpers::Data
-          include Legion::Extensions::Helpers::Lex
+          extend self # rubocop:disable Style/ModuleFunction -- Included helpers must also be callable on the runner module.
+          include Legion::Extensions::Scheduler::Helpers::Mode
 
-          VALID_MODES = %w[active idle dream maintenance].freeze
+          def transition(mode:, force: false, **)
+            target = mode.to_s
+            raise ArgumentError, "unsupported scheduler mode #{target.inspect}" unless settings[:modes].include?(target)
 
-          def transition(**opts)
-            target_mode = opts[:mode] || opts['mode']
-            return unless target_mode
-            return unless valid_mode?(target_mode)
+            current = scheduler_current_mode
+            return { success: true, changed: false, mode: current } if current == target
 
-            force = opts[:force] || opts['force'] || false
-            current_mode = fetch_current_mode
-            return if current_mode == target_mode.to_s
-
-            return if !force && critical_tasks_running?
-
-            execute_transition(from: current_mode, to: target_mode.to_s)
-          end
-
-          def valid_mode?(mode)
-            VALID_MODES.include?(mode.to_s)
-          end
-
-          def critical_tasks_running?
             count = cache_get('scheduler_critical_task_count')
-            count.is_a?(Integer) ? count.positive? : false
-          end
+            return { success: false, changed: false, mode: current, reason: :critical_tasks_running } if !force && count.is_a?(Integer) && count.positive?
 
-          def fetch_current_mode
-            cache_get('scheduler_operating_mode') || 'active'
-          end
-
-          def execute_transition(_from:, to:)
-            cache_set('scheduler_operating_mode', to, 3600)
+            scheduler_change_mode(from: current, to: target)
           end
         end
       end
