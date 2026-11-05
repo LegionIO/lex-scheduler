@@ -5,7 +5,7 @@ module Legion
     module Scheduler
       module Actor
         # The instance time method resolves current settings instead of freezing a DSL literal at load time.
-        class RunScheduler < Legion::Extensions::Actors::Every
+        class RunScheduler < Legion::Extensions::Actors::Every # rubocop:disable Legion/Extension/EveryActorRequiresTime -- time reads live settings.
           include Legion::Extensions::Actors::Singleton if defined?(Legion::Extensions::Actors::Singleton)
 
           def time

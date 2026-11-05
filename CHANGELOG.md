@@ -3,20 +3,18 @@
 ## [0.4.0] - 2026-10-30
 
 ### Added
-- Atomic schedule occurrence claims with durable task/outbox creation in migration 007.
-- Configurable interval basis, overlap and bounded misfire policies; completion tracking reads persisted task outcomes, including transformed fanout.
 - Canonical metadata in a separate schedule `context` field, preserving business payloads without allowing target overrides.
-- Real SQLite/task-substrate integration coverage for races, invalid definitions, rollback, recovery and completion.
+- Bounded misfire policies and real SQLite/in-process transport coverage for cron, interval, one-shot and direct publication.
 
 ### Changed
-- `last_run` records the logical occurrence cursor, not broker delivery or runner completion.
-- Scheduler dispatch is exclusively via the lex-tasker durable outbox relay; direct submissions require `idempotency_key:`.
-- Standalone parser injection now controls schedule parsing; all runners use settings/logging/cache helpers and return Hashes.
-- Require legion-settings 1.4.5, legion-data 1.11.0 with migration 144, legion-transport 1.4.32, and lex-tasker 0.4.0.
-- Keep ancestry bounds in Scheduler-local settings; use immutable Transport task-protocol and Scheduler occurrence identities so local settings cannot reinterpret durable outcomes.
+- Create tasks through the existing Sequel Task model and publish directly through canonical Dynamic/SubTask messages.
+- Advance `last_run` only after accepted publication (or an explicit misfire skip); schedule logs report dispatch, not task completion.
+- Standalone parser injection controls schedule parsing; all runners use settings/logging/cache helpers and return Hashes.
+- Require legion-settings 1.4.5, legion-data 1.11.0 and legion-transport 1.4.32. Use local core checkouts during development.
 - Read live extension settings through framework-injected helpers; standalone clients use the standard settings helper and boot-time default registration.
 
 ### Removed
+- Pending-PR occurrence tables, locks, claims, completion reconciliation and execution outbox coordination; no Tasker runtime dependency.
 - Obsolete no-op refresh actor/message/queue and custom SendTask message; canonical task envelopes serve both direct and transform routes.
 - Mock framework/spec scaffolding and tests that only restated implementation defaults.
 

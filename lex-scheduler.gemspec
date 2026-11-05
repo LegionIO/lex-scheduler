@@ -33,5 +33,4 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'legion-logging', '>= 1.3.2'
   spec.add_dependency 'legion-settings', '>= 1.4.5'
   spec.add_dependency 'legion-transport', '>= 1.4.32'
-  spec.add_dependency 'lex-tasker', '>= 0.4.0'
 end

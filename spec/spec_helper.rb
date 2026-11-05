@@ -20,14 +20,13 @@ SCHEDULER_SPEC_DB = Sequel.sqlite(File.join(SCHEDULER_SPEC_DIRECTORY, 'scheduler
 Legion::Data::Connection.sequel = SCHEDULER_SPEC_DB
 Sequel::Model.db = SCHEDULER_SPEC_DB
 
-# Apply the real migrations for the task substrate and scheduler, excluding unrelated PostgreSQL-only integrations.
+# Apply real task and scheduler migrations, excluding unrelated PostgreSQL-only integrations.
 %w[identity_principals identities].each do |table|
   SCHEDULER_SPEC_DB.create_table(table.to_sym) { primary_key :id }
 end
 data_migrations = File.join(Gem.loaded_specs.fetch('legion-data').full_gem_path, 'lib/legion/data/migrations')
 %w[004_add_extensions 005_add_runners 006_add_functions 008_add_tasks 009_add_digital_workers 021_add_archive_tables 031_add_task_depth
-   032_add_task_cancelled_at 033_add_task_delay 075_add_task_idempotency
-   139_add_task_execution 140_create_task_attempts 141_create_task_dispatches 144_add_task_execution_policy].each do |migration|
+   032_add_task_cancelled_at 033_add_task_delay 075_add_task_idempotency].each do |migration|
   load File.join(data_migrations, "#{migration}.rb")
   Sequel::Migration.descendants.pop.apply(SCHEDULER_SPEC_DB, :up)
 end
@@ -39,7 +38,6 @@ require 'legion/data/models/runner'
 require 'legion/data/models/extension'
 require 'legion/data/models/task'
 require 'legion/transport'
-require 'legion/extensions/tasker/runners/outbox'
 require 'legion/extensions/scheduler'
 require 'legion/extensions/scheduler/data/models/schedule'
 require 'legion/extensions/scheduler/data/models/schedule_log'
@@ -60,10 +58,11 @@ RSpec.configure do |config|
   end
   config.before do
     Legion::Transport::Local.reset!
-    %i[schedule_logs schedule_occurrences task_dispatches task_attempts schedules tasks functions runners extensions].each do |table|
+    %i[schedule_logs schedules tasks functions runners extensions].each do |table|
       SCHEDULER_SPEC_DB[table].delete
     end
     Legion::Settings[:extensions][:scheduler] = Legion::Extensions::Scheduler.default_settings
+    Legion::Settings[:transport][:messages][:encrypt] = false
   end
   config.after(:suite) do
     Legion::Transport::Connection.shutdown
