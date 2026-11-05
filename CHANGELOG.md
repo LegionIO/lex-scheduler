@@ -10,7 +10,7 @@
 - Create tasks through the existing Sequel Task model and publish directly through canonical Dynamic/SubTask messages.
 - Advance `last_run` only after accepted publication (or an explicit misfire skip); schedule logs report dispatch, not task completion.
 - Standalone parser injection controls schedule parsing; all runners use settings/logging/cache helpers and return Hashes.
-- Require legion-settings 1.4.5, legion-data 1.11.0 and legion-transport 1.4.32. Use local core checkouts during development.
+- Require legion-settings 1.4.5, legion-data 1.11.0 and legion-transport 1.4.32. Require transport during extension loading for direct publication. Use local core checkouts during development.
 - Read live extension settings through framework-injected helpers; standalone clients use the standard settings helper and boot-time default registration.
 
 ### Removed

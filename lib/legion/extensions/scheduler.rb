@@ -16,10 +16,6 @@ module Legion
         true
       end
 
-      def self.transport_required?
-        false
-      end
-
       def self.default_settings
         {
           poll_interval_seconds:  1,
