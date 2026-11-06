@@ -2,6 +2,14 @@
 
 ## [0.4.0] - 2026-10-30
 
+### Breaking changes
+- `send_task` requires `function_id:` and accepts business input through `args:` and canonical metadata through `context:`. It returns `{ success: true, task: task.values }`; it is not a transport-message return value or an idempotent outbox operation. Publication and database errors propagate from direct submissions.
+- Schedule `payload` is business input only; use the new `context` field for task metadata. Payload values can no longer replace the target function, routing identity, or new task ID.
+- Invalid schedules and unsupported misfire policies are reported as errors rather than falling through to dispatch. `schedule_tasks` returns a result Hash with accepted-dispatch counts and per-schedule errors; schedule logs do not claim execution success.
+- Interval cadence follows logical scheduled-time slots rather than the wall-clock time of each poll. `last_run` records that slot, and missed slots follow the configured coalesce/skip/catch-up policy. Do not run competing polls expecting distributed deduplication.
+- `push_refresh`, the no-op `refresh` method, refresh actor/message/queue, and custom `SendTask` message are removed. Call `schedule_tasks` for an explicit poll; configure transport because dispatch now publishes directly.
+- Apply Scheduler migration `007_schedule_context` and the required Data migrations before starting the upgraded actors. No occurrence claims, leases, or task-execution outbox API are provided.
+
 ### Added
 - Canonical metadata in a separate schedule `context` field, preserving business payloads without allowing target overrides.
 - Bounded misfire policies and real SQLite/in-process transport coverage for cron, interval, one-shot and direct publication.
@@ -11,7 +19,8 @@
 - Advance `last_run` only after accepted publication (or an explicit misfire skip); schedule logs report dispatch, not task completion.
 - Standalone parser injection controls schedule parsing; all runners use settings/logging/cache helpers and return Hashes.
 - Require legion-settings 1.4.5, legion-data 1.11.0 and legion-transport 1.4.32. Require transport during extension loading for direct publication. Use local core checkouts during development.
-- Read live extension settings through framework-injected helpers; standalone clients use the standard settings helper and boot-time default registration.
+- Read live extension settings through framework-injected helpers; register defaults at root `scheduler.rb` boot instead of during standalone client initialization.
+- Use released Transport in CI and the current Data companion revision; retain the existing parser and model-namespace client APIs.
 
 ### Removed
 - Pending-PR occurrence tables, locks, claims, completion reconciliation and execution outbox coordination; no Tasker runtime dependency.

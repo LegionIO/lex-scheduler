@@ -40,7 +40,7 @@ New intervals are eligible at creation time. Cron schedules wait for a matching 
 
 ## Polling and missed schedules
 
-Settings live under `extensions.scheduler`:
+Settings live under `extensions.scheduler`. `def self.default_settings` is defined in root `scheduler.rb`, which registers defaults once at extension boot. Constructing a client does not change settings.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -71,7 +71,7 @@ client.send_task(function_id: 42, args: { account_id: 123 },
                  context: { principal_id: 'scheduler-service', principal_type: 'service' })
 ```
 
-`send_task` publishes synchronously and returns `{ success: true, task: task.values }`. Each call creates a separate task; the former execution-outbox `idempotency_key:` contract is removed. `data_model:` can inject a scheduler model namespace; `fugit:` injects the parser used for due-time evaluation. Settings defaults are registered during client initialization.
+`send_task` publishes synchronously and returns `{ success: true, task: task.values }`. Each call creates a separate task; the former execution-outbox `idempotency_key:` contract is removed. `data_model:` can inject a scheduler model namespace; `fugit:` injects the parser used for due-time evaluation. Both existing client APIs are retained; defaults are registered by root-module boot, not client initialization.
 
 ## Operating-mode runners
 
@@ -85,7 +85,7 @@ The former no-op refresh actor, refresh queue and custom SendTask envelope have 
 
 ## Development
 
-The Gemfile uses `.ci-dependencies/<repo>` for coordinated PR CI, otherwise the existing legion-settings, legion-data and legion-transport checkouts at the monorepo root. Ordinary installations resolve released gems. No Git URL dependencies or generated artifacts belong in the gem.
+The Gemfile uses `.ci-dependencies/<repo>` for coordinated PR CI, otherwise the existing legion-settings, legion-data and legion-transport checkouts at the monorepo root. CI pins the coordinated Settings/Data revisions and uses released Transport. Ordinary installations resolve released gems. No Git URL dependencies or generated artifacts belong in the gem.
 
 Specs use a disposable SQLite database with real task and scheduler migrations, plus the in-process transport with a bound target queue and encryption disabled. Broker smoke checks need a bound target queue (and the transform queue when testing templates); accepted publication alone does not execute a target. Run the full RSpec and RuboCop gates before release.
 

@@ -12,7 +12,6 @@ module Legion
         def initialize(data_model: nil, fugit: Fugit)
           @data_model = data_model
           @fugit = fugit
-          Legion::Settings.loader.load_module_default(extensions: { scheduler: Legion::Extensions::Scheduler.default_settings })
         end
 
         def models_class

@@ -36,3 +36,5 @@ module Legion
     end
   end
 end
+
+Legion::Settings.merge_settings(:extensions, scheduler: Legion::Extensions::Scheduler.default_settings)
